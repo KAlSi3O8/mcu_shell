@@ -19,7 +19,7 @@ all: $(objs)
 	@arm-none-eabi-gcc -c $^ -o ./out/$@ $(BuildParams) $(IncludePath)
 
 flash:
-	@sudo stm32flash -w $(TARGET).hex /dev/ttyUSB0
+	@stm32flash -R -i rts,dtr:-dtr,-rts -w $(TARGET).hex /dev/ttyUSB0
 
 clean:
 	@rm out/*

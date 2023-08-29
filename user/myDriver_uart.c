@@ -1,6 +1,6 @@
 #include <stm32f4xx_conf.h>
 #include "myDriver_uart.h"
-#include <string.h>
+#include <stdio.h>
 
 static uint8_t uart1_dma_bufa[DMA_BUFFER_SIZE];
 static uint8_t uart1_dma_bufb[DMA_BUFFER_SIZE];
@@ -20,6 +20,7 @@ void usart1_dma_init(void) {
     DMA_Init(DMA2_Stream5, &hDMA2_S5);
     DMA_ITConfig(DMA2_Stream5, DMA_IT_TC, ENABLE);
     DMA_DoubleBufferModeConfig(DMA2_Stream5, (uint32_t)uart1_dma_bufb, DMA_Memory_0);
+    DMA_DoubleBufferModeCmd(DMA2_Stream5, ENABLE);
 
     NVIC_SetPriorityGrouping(NVIC_PriorityGroup_0);
     hNVIC.NVIC_IRQChannel = DMA2_Stream5_IRQn;
@@ -70,6 +71,7 @@ void usart1_init(void) {
     usart1_dma_init();
 
     USART_Cmd(USART1, ENABLE);
+    return;
 }
 
 void usart1_sendstr(char *str) {
@@ -84,14 +86,39 @@ void usart1_sendstr(char *str) {
 }
 
 void USART1_IRQHandler(void) {
-    
+    if(USART_GetITStatus(USART1, USART_IT_IDLE)) {
+        USART1->SR;
+        USART1->DR;
+        DMA_Cmd(DMA2_Stream5, DISABLE);
+        DMA_SetCurrDataCounter(DMA2_Stream5, DMA_BUFFER_SIZE);
+        if(0 == DMA_GetCurrentMemoryTarget(DMA2_Stream5)) {
+            DMA2_Stream5->CR |= (uint32_t)DMA_SxCR_CT;
+            usart1_sendstr("[USART1]memory slot --> 0\r\ndata -->\r\n");
+            usart1_sendstr(uart1_dma_bufa);
+            usart1_sendstr("\r\n[USART1]switch to slot 1\r\n\n");
+        } else {
+            DMA2_Stream5->CR &= ~(uint32_t)DMA_SxCR_CT;
+            usart1_sendstr("[USART1]memory slot --> 1\r\ndata -->\r\n");
+            usart1_sendstr(uart1_dma_bufb);
+            usart1_sendstr("\r\n[USART1]switch to slot 0\r\n\n");
+        }
+        DMA_Cmd(DMA2_Stream5, ENABLE);
+    }
+    return;
 }
 
 void DMA2_Stream5_IRQHandler(void) {
-    uint32_t memoryslot;
-    char buf[32] = {0};
     if(DMA_GetITStatus(DMA2_Stream5, DMA_IT_TC)) {
         DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_TC);
-        memoryslot = DMA_GetCurrentMemoryTarget(DMA2_Stream5);
+        if(DMA_GetCurrentMemoryTarget(DMA2_Stream5) == 0) {
+            usart1_sendstr("[DMA2_S5]memory slot --> 0\r\ndata -->\r\n");
+            usart1_sendstr(uart1_dma_bufa);
+            usart1_sendstr("\r\n[DMA2_S5]switch to slot 1\r\n\n");
+        } else {
+            usart1_sendstr("[DMA2_S5]memory slot --> 1\r\ndata -->\r\n");
+            usart1_sendstr(uart1_dma_bufb);
+            usart1_sendstr("\r\n[DMA2_S5]switch to slot 0\r\n\n");
+        }
     }
+    return;
 }
