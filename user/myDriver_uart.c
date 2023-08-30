@@ -2,8 +2,11 @@
 #include "myDriver_uart.h"
 #include <stdio.h>
 
-static uint8_t uart1_dma_bufa[DMA_BUFFER_SIZE];
-static uint8_t uart1_dma_bufb[DMA_BUFFER_SIZE];
+static struct _uart1_dma_buf {
+    uint8_t slot;
+    uint8_t a[DMA_BUFFER_SIZE];
+    uint8_t b[DMA_BUFFER_SIZE];
+}uart1_dma_buf;
 
 void usart1_dma_init(void) {
     DMA_InitTypeDef hDMA2_S5;
@@ -14,12 +17,12 @@ void usart1_dma_init(void) {
     DMA_StructInit(&hDMA2_S5);
     hDMA2_S5.DMA_Channel = DMA_Channel_4;
     hDMA2_S5.DMA_PeripheralBaseAddr = (uint32_t)&USART1->DR;
-    hDMA2_S5.DMA_Memory0BaseAddr = (uint32_t)uart1_dma_bufa;
+    hDMA2_S5.DMA_Memory0BaseAddr = (uint32_t)uart1_dma_buf.a;
     hDMA2_S5.DMA_DIR = DMA_DIR_PeripheralToMemory;
     hDMA2_S5.DMA_BufferSize = DMA_BUFFER_SIZE;
     DMA_Init(DMA2_Stream5, &hDMA2_S5);
     DMA_ITConfig(DMA2_Stream5, DMA_IT_TC, ENABLE);
-    DMA_DoubleBufferModeConfig(DMA2_Stream5, (uint32_t)uart1_dma_bufb, DMA_Memory_0);
+    DMA_DoubleBufferModeConfig(DMA2_Stream5, (uint32_t)uart1_dma_buf.b, DMA_Memory_0);
     DMA_DoubleBufferModeCmd(DMA2_Stream5, ENABLE);
 
     NVIC_SetPriorityGrouping(NVIC_PriorityGroup_0);
@@ -67,21 +70,18 @@ void usart1_init(void) {
     hNVIC.NVIC_IRQChannelSubPriority = 15;
     NVIC_Init(&hNVIC);
 
-// Config Rx DMA
-    usart1_dma_init();
-
     USART_Cmd(USART1, ENABLE);
     return;
 }
 
 void usart1_sendstr(char *str) {
     int len = strlen(str);
-    GPIO_ResetBits(GPIOA, GPIO_Pin_8);
+    GPIO_SetBits(GPIOA, GPIO_Pin_8);
     for(int i = 0; i < len; i++) {
         USART_SendData(USART1, str[i]);
         while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
     }
-    GPIO_SetBits(GPIOA, GPIO_Pin_8);
+    GPIO_ResetBits(GPIOA, GPIO_Pin_8);
     return;
 }
 
@@ -89,20 +89,18 @@ void USART1_IRQHandler(void) {
     if(USART_GetITStatus(USART1, USART_IT_IDLE)) {
         USART1->SR;
         USART1->DR;
-        DMA_Cmd(DMA2_Stream5, DISABLE);
-        DMA_SetCurrDataCounter(DMA2_Stream5, DMA_BUFFER_SIZE);
-        if(0 == DMA_GetCurrentMemoryTarget(DMA2_Stream5)) {
-            DMA2_Stream5->CR |= (uint32_t)DMA_SxCR_CT;
-            usart1_sendstr("[USART1]memory slot --> 0\r\ndata -->\r\n");
-            usart1_sendstr(uart1_dma_bufa);
-            usart1_sendstr("\r\n[USART1]switch to slot 1\r\n\n");
-        } else {
-            DMA2_Stream5->CR &= ~(uint32_t)DMA_SxCR_CT;
-            usart1_sendstr("[USART1]memory slot --> 1\r\ndata -->\r\n");
-            usart1_sendstr(uart1_dma_bufb);
-            usart1_sendstr("\r\n[USART1]switch to slot 0\r\n\n");
-        }
-        DMA_Cmd(DMA2_Stream5, ENABLE);
+        USART_SendData(USART1, USART_ReceiveData(USART1));
+        // if(0 == DMA_GetCurrentMemoryTarget(DMA2_Stream5)) {
+        //     DMA2_Stream5->CR |= (uint32_t)DMA_SxCR_CT;
+        //     usart1_sendstr("[USART1]memory slot --> 0\r\ndata -->\r\n");
+        //     usart1_sendstr(uart1_dma_buf.a);
+        //     usart1_sendstr("\r\n[USART1]switch to slot 1\r\n\n");
+        // } else {
+        //     DMA2_Stream5->CR &= ~(uint32_t)DMA_SxCR_CT;
+        //     usart1_sendstr("[USART1]memory slot --> 1\r\ndata -->\r\n");
+        //     usart1_sendstr(uart1_dma_buf.b);
+        //     usart1_sendstr("\r\n[USART1]switch to slot 0\r\n\n");
+        // }
     }
     return;
 }
@@ -112,11 +110,11 @@ void DMA2_Stream5_IRQHandler(void) {
         DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_TC);
         if(DMA_GetCurrentMemoryTarget(DMA2_Stream5) == 0) {
             usart1_sendstr("[DMA2_S5]memory slot --> 0\r\ndata -->\r\n");
-            usart1_sendstr(uart1_dma_bufa);
+            usart1_sendstr(uart1_dma_buf.a);
             usart1_sendstr("\r\n[DMA2_S5]switch to slot 1\r\n\n");
         } else {
             usart1_sendstr("[DMA2_S5]memory slot --> 1\r\ndata -->\r\n");
-            usart1_sendstr(uart1_dma_bufb);
+            usart1_sendstr(uart1_dma_buf.b);
             usart1_sendstr("\r\n[DMA2_S5]switch to slot 0\r\n\n");
         }
     }

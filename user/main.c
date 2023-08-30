@@ -32,7 +32,7 @@ int main(void) {
 
     usart1_init();
     while(1) {
-        usart1_sendstr("Hello World!\r\n");
+        //usart1_sendstr("Hello World!\r\n");
         delay_ms(1000);
     }
 }
