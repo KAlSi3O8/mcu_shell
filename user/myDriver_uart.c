@@ -1,42 +1,65 @@
 #include <stm32f4xx_conf.h>
+#include <string.h>
 #include "myDriver_uart.h"
-#include <stdio.h>
 
-static struct _uart1_dma_buf {
-    uint8_t slot;
-    uint8_t a[DMA_BUFFER_SIZE];
-    uint8_t b[DMA_BUFFER_SIZE];
-}uart1_dma_buf;
+struct _uart_dual_buf uart1_dual_buf;
 
-void usart1_dma_init(void) {
-    DMA_InitTypeDef hDMA2_S5;
-    NVIC_InitTypeDef hNVIC;
-
-    RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_DMA2EN, ENABLE);
-
-    DMA_StructInit(&hDMA2_S5);
-    hDMA2_S5.DMA_Channel = DMA_Channel_4;
-    hDMA2_S5.DMA_PeripheralBaseAddr = (uint32_t)&USART1->DR;
-    hDMA2_S5.DMA_Memory0BaseAddr = (uint32_t)uart1_dma_buf.a;
-    hDMA2_S5.DMA_DIR = DMA_DIR_PeripheralToMemory;
-    hDMA2_S5.DMA_BufferSize = DMA_BUFFER_SIZE;
-    DMA_Init(DMA2_Stream5, &hDMA2_S5);
-    DMA_ITConfig(DMA2_Stream5, DMA_IT_TC, ENABLE);
-    DMA_DoubleBufferModeConfig(DMA2_Stream5, (uint32_t)uart1_dma_buf.b, DMA_Memory_0);
-    DMA_DoubleBufferModeCmd(DMA2_Stream5, ENABLE);
-
-    NVIC_SetPriorityGrouping(NVIC_PriorityGroup_0);
-    hNVIC.NVIC_IRQChannel = DMA2_Stream5_IRQn;
-    hNVIC.NVIC_IRQChannelCmd = ENABLE;
-    hNVIC.NVIC_IRQChannelPreemptionPriority = 0;
-    hNVIC.NVIC_IRQChannelSubPriority = 10;
-    NVIC_Init(&hNVIC);
-
-    DMA_Cmd(DMA2_Stream5, ENABLE);
-    USART_DMACmd(USART1, USART_DMAReq_Rx, ENABLE);
-    return;
+/**
+ * @brief   set current usart1 buf slot
+ * @param   slot: slot num(SLOT_A， SLOT_B)
+ * @retval  -1: param slot is not a slot num
+ * @retval  -2: slot has not been read, data may overwrite
+ * @retval  0: set slot success
+*/
+int32_t usart1_set_slot(uint8_t slot) {
+    if(slot != SLOT_A && SLOT_B != 1) {
+        return -1;
+    }
+    if(uart1_dual_buf.slot_flag & SLOT_MSK(slot)) {
+        return -2;
+    }
+    uart1_dual_buf.slot_num = slot;
+    return 0;
 }
 
+/**
+ * @brief   switch usart1 RX buffer slot
+ * @retval  -1: slot has not been read, data may overwrite
+ * @retval  0: switch slot success
+*/
+int32_t usart1_switch_slot(void) {
+    // set slot ready to read flag
+    uart1_dual_buf.slot_flag |= SLOT_MSK(uart1_dual_buf.slot_num);
+    // save data len of current slot
+    uart1_dual_buf.buf_len[uart1_dual_buf.slot_num] = uart1_dual_buf.index;
+    // switch slot num
+    uart1_dual_buf.slot_num ^= 0x01;
+    // reset buf index
+    uart1_dual_buf.index = 0;
+    // check slot status
+    if(uart1_dual_buf.slot_flag & SLOT_MSK(uart1_dual_buf.slot_num)) {
+        return -1;
+    }
+    return 0;
+}
+
+/**
+ * @brief   get usart1 ready buffer num
+ * @retval  -1: no buffer is ready
+ * @retval  0: ret buffer is ready to read
+*/
+int32_t usart1_get_ready_slot(void) {
+    uint8_t ready_slot;
+    ready_slot = uart1_dual_buf.slot_num ? SLOT_A : SLOT_B;
+    if((uart1_dual_buf.slot_flag & SLOT_MSK(ready_slot)) == 0) {
+        return -1;
+    }
+    return ready_slot;
+}
+
+/**
+ * @brief   init usart1 clock/gpio/interrup and enable usart1
+*/
 void usart1_init(void) {
     GPIO_InitTypeDef hGPIOA;
     USART_InitTypeDef hUSART1;
@@ -60,7 +83,7 @@ void usart1_init(void) {
     USART_StructInit(&hUSART1);
     hUSART1.USART_BaudRate = 115200;
     USART_Init(USART1, &hUSART1);
-    USART_ITConfig(USART1, USART_IT_IDLE, ENABLE);
+    USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
 
 // Config UART RX NVIC
     NVIC_SetPriorityGrouping(NVIC_PriorityGroup_0);
@@ -70,10 +93,18 @@ void usart1_init(void) {
     hNVIC.NVIC_IRQChannelSubPriority = 15;
     NVIC_Init(&hNVIC);
 
+// Initing RX buf
+    memset(&uart1_dual_buf, 0, sizeof(uart1_dual_buf));
+
     USART_Cmd(USART1, ENABLE);
     return;
 }
 
+/**
+ * @brief   send str to usart1
+ * @param   str: message to be sent
+ * @retval  None
+ */
 void usart1_sendstr(char *str) {
     int len = strlen(str);
     GPIO_SetBits(GPIOA, GPIO_Pin_8);
@@ -85,38 +116,38 @@ void usart1_sendstr(char *str) {
     return;
 }
 
-void USART1_IRQHandler(void) {
-    if(USART_GetITStatus(USART1, USART_IT_IDLE)) {
-        USART1->SR;
-        USART1->DR;
-        USART_SendData(USART1, USART_ReceiveData(USART1));
-        // if(0 == DMA_GetCurrentMemoryTarget(DMA2_Stream5)) {
-        //     DMA2_Stream5->CR |= (uint32_t)DMA_SxCR_CT;
-        //     usart1_sendstr("[USART1]memory slot --> 0\r\ndata -->\r\n");
-        //     usart1_sendstr(uart1_dma_buf.a);
-        //     usart1_sendstr("\r\n[USART1]switch to slot 1\r\n\n");
-        // } else {
-        //     DMA2_Stream5->CR &= ~(uint32_t)DMA_SxCR_CT;
-        //     usart1_sendstr("[USART1]memory slot --> 1\r\ndata -->\r\n");
-        //     usart1_sendstr(uart1_dma_buf.b);
-        //     usart1_sendstr("\r\n[USART1]switch to slot 0\r\n\n");
-        // }
+/**
+ * @brief   send n bytes of str to usart1
+ * @param   str: message to be sent
+ * @param   n: number of bytes to send
+ * @retval  None
+ */
+void usart1_sendnstr(char *str, uint32_t n) {
+    GPIO_SetBits(GPIOA, GPIO_Pin_8);
+    for(int i = 0; i < n; i++) {
+        USART_SendData(USART1, str[i]);
+        while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
     }
+    GPIO_ResetBits(GPIOA, GPIO_Pin_8);
     return;
 }
 
-void DMA2_Stream5_IRQHandler(void) {
-    if(DMA_GetITStatus(DMA2_Stream5, DMA_IT_TC)) {
-        DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_TC);
-        if(DMA_GetCurrentMemoryTarget(DMA2_Stream5) == 0) {
-            usart1_sendstr("[DMA2_S5]memory slot --> 0\r\ndata -->\r\n");
-            usart1_sendstr(uart1_dma_buf.a);
-            usart1_sendstr("\r\n[DMA2_S5]switch to slot 1\r\n\n");
-        } else {
-            usart1_sendstr("[DMA2_S5]memory slot --> 1\r\ndata -->\r\n");
-            usart1_sendstr(uart1_dma_buf.b);
-            usart1_sendstr("\r\n[DMA2_S5]switch to slot 0\r\n\n");
+void USART1_IRQHandler(void) {
+    char tmp;
+    if(USART_GetITStatus(USART1, USART_IT_RXNE)) {
+        tmp = USART_ReceiveData(USART1);
+        USART_SendData(USART1, tmp);
+        while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
+        uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = tmp;
+        uart1_dual_buf.index++;
+        if(tmp == '\r') {
+            USART_SendData(USART1, '\n');
+            while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
+            uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = '\n';
+            uart1_dual_buf.index++;
+            usart1_switch_slot();
         }
+        USART_ClearITPendingBit(USART1, USART_IT_RXNE);
     }
     return;
 }

@@ -28,11 +28,15 @@ void system_start(void) {
 }
 
 int main(void) {
+    int32_t ready_slot;
     system_start();
 
     usart1_init();
     while(1) {
-        usart1_sendstr("Hello World!\r\n");
-        delay_ms(1000);
+        ready_slot = usart1_get_ready_slot();
+        if(ready_slot != -1) {
+            usart1_sendnstr(uart1_dual_buf.buf[ready_slot], uart1_dual_buf.buf_len[ready_slot]);
+            uart1_dual_buf.slot_flag &= ~SLOT_MSK(ready_slot);
+        }
     }
 }
