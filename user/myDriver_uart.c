@@ -143,8 +143,8 @@ void USART1_IRQHandler(void) {
         if(tmp == '\r') {
             USART_SendData(USART1, '\n');
             while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
-            uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = '\n';
-            uart1_dual_buf.index++;
+            // uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = '\n';
+            // uart1_dual_buf.index++;
             usart1_switch_slot();
         }
         USART_ClearITPendingBit(USART1, USART_IT_RXNE);
