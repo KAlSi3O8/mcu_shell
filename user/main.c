@@ -45,8 +45,8 @@ int devmem(char* args) {
     int arg_len;
     char* arg = args;
     char* tmp;
-    uint32_t addr;
-    uint32_t val;
+    __IO uint32_t* addr;
+    __IO uint32_t val;
 
     arg_len = get_token_size(&args);
     if(arg_len == 0) {
@@ -54,14 +54,52 @@ int devmem(char* args) {
         return 1;
     }
     tmp = (char*)malloc(arg_len + 1);
+    memset(tmp, 0, arg_len + 1);
     strncpy(tmp, arg, arg_len);
     addr = strtoul(tmp+2, NULL, 16);
-    val = *(__IO uint32_t*)addr;
     free(tmp);
 
-    tmp = (char*)malloc(64);
-    sprintf(tmp, "Value in 0x%08x is 0x%08x(%d)\r\n", addr, val, val);
-    usart1_sendstr(tmp);
+    arg = args;
+    arg_len = get_token_size(&args);
+    if(arg_len == 0) {
+        tmp = (char*)malloc(64);
+        memset(tmp, 0, 64);
+        sprintf(tmp, "Value in 0x%08x is 0x%08x(%u)\r\n", addr, *addr, *addr);
+        usart1_sendstr(tmp);
+        free(tmp);
+        return 0;
+    }
+    if(arg_len == 1 && arg[0] == 'w') {
+        arg = args;
+        usart1_sendstr(arg);
+        arg_len = get_token_size(&args);
+        if(arg_len == 0) {
+            usart1_sendstr("lack of params\r\n");
+            usart1_sendstr("Usage: devmem reg_addr [w value]\r\n");
+            return -1;
+        }
+
+        tmp = (char*)malloc(arg_len + 1);
+        memset(tmp, 0, arg_len + 1);
+        strncpy(tmp, arg, arg_len);
+        if(tmp[0] == '0' && tmp[1] == 'x') {
+            val = strtoul(tmp+2, NULL, 16);
+        } else {
+            val = strtoul(tmp, NULL, 10);
+        }
+        free(tmp);
+
+        tmp = (char*)malloc(64);
+        memset(tmp, 0, 64);
+        sprintf(tmp, "Wrote 0x%08x(%u) to 0x%08x\r\n", val, val, addr);
+        usart1_sendstr(tmp);
+        free(tmp);
+        *addr = val;
+    } else {
+        usart1_sendstr("params worng\r\n");
+        usart1_sendstr("Usage: devmem reg_addr [w value]\r\n");
+        return -1;
+    }
 
     return 0;
 }

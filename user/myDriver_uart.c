@@ -107,12 +107,10 @@ void usart1_init(void) {
  */
 void usart1_sendstr(char *str) {
     int len = strlen(str);
-    GPIO_SetBits(GPIOA, GPIO_Pin_8);
     for(int i = 0; i < len; i++) {
         USART_SendData(USART1, str[i]);
         while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
     }
-    GPIO_ResetBits(GPIOA, GPIO_Pin_8);
     return;
 }
 
@@ -123,12 +121,10 @@ void usart1_sendstr(char *str) {
  * @retval  None
  */
 void usart1_sendnstr(char *str, uint32_t n) {
-    GPIO_SetBits(GPIOA, GPIO_Pin_8);
     for(int i = 0; i < n; i++) {
         USART_SendData(USART1, str[i]);
         while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
     }
-    GPIO_ResetBits(GPIOA, GPIO_Pin_8);
     return;
 }
 
@@ -138,13 +134,21 @@ void USART1_IRQHandler(void) {
         tmp = USART_ReceiveData(USART1);
         USART_SendData(USART1, tmp);
         while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
-        uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = tmp;
-        uart1_dual_buf.index++;
+        if(tmp == '\b') {
+            USART_SendData(USART1, ' ');
+            while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
+            USART_SendData(USART1, '\b');
+            while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
+            uart1_dual_buf.index--;
+            uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = 0;
+        } else {
+            uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = tmp;
+            uart1_dual_buf.index++;
+        }
         if(tmp == '\r') {
             USART_SendData(USART1, '\n');
             while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
-            // uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = '\n';
-            // uart1_dual_buf.index++;
+            uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = 0;
             usart1_switch_slot();
         }
         USART_ClearITPendingBit(USART1, USART_IT_RXNE);
