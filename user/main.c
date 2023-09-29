@@ -1,9 +1,9 @@
 #include <stm32f4xx_conf.h>
-#include <stm32f4xx.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "myos.h"
 #include "myDriver_uart.h"
 
 void delay_ms(uint32_t time) {
@@ -142,12 +142,7 @@ int main(void) {
     int32_t ready_slot;
     system_start();
 
-    usart1_init();
-    while(1) {
-        ready_slot = usart1_get_ready_slot();
-        if(ready_slot != -1) {
-            process_cmd(uart1_dual_buf.buf[ready_slot], uart1_dual_buf.buf_len[ready_slot]);
-            uart1_dual_buf.slot_flag &= ~SLOT_MSK(ready_slot);
-        }
-    }
+    myos_Init();
+    myos_Start();
+    while(1);
 }

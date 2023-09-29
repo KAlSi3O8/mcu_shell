@@ -3,9 +3,11 @@ BuildParams := -w -mthumb -mcpu=cortex-m4 -DSTM32F40_41xxx -DUSE_STDPERIPH_DRIVE
 LinkParams := -mthumb -mcpu=cortex-m4 -T $(shell find -name "*.ld") -specs=nosys.specs -static -Wl,-cref,-u,Reset_Handler -Wl,-Map=out/$(TARGET).map -Wl,--gc-sections -Wl,--defsym=malloc_getpagesize_P=0x80 -Wl,--start-group -lc -lm -Wl,--end-group
 IncludePath := -Ilib/inc/
 IncludePath += -Icore/
+IncludePath += -Imyos/
 VPATH := ./lib/src/
 VPATH += ./core/
 VPATH += ./user/
+VPATH += ./myos/
 objs := $(addsuffix .o, $(basename $(notdir $(shell find -name "*.[c|s]"))))
 
 all: $(objs)
