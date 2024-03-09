@@ -1,5 +1,5 @@
 # mcu_shell
-搞着玩的
+~~搞着玩的~~ 现在是我的毕设了
 ## Brief
 This project is for STM32F405RGT6. Using GNU Arm Embedded Toolchain 10.3-2021.10 to build.
 ## How to build
