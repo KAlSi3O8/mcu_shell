@@ -15,16 +15,16 @@ void delay_ms(uint32_t time) {
 }
 
 void system_start(void) {
-    GPIO_InitTypeDef hGPIOA;
-    RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_GPIOAEN, ENABLE);
+    GPIO_InitTypeDef hGPIOF;
+    RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_GPIOFEN, ENABLE);
 
-    hGPIOA.GPIO_Mode = GPIO_Mode_OUT;
-    hGPIOA.GPIO_OType = GPIO_OType_PP;
-    hGPIOA.GPIO_Pin = GPIO_Pin_8;
-    hGPIOA.GPIO_PuPd = GPIO_PuPd_UP;
-    hGPIOA.GPIO_Speed = GPIO_Speed_2MHz;
-    GPIO_Init(GPIOA, &hGPIOA);
-    GPIO_ResetBits(GPIOA, GPIO_Pin_8);
+    hGPIOF.GPIO_Mode = GPIO_Mode_OUT;
+    hGPIOF.GPIO_OType = GPIO_OType_PP;
+    hGPIOF.GPIO_Pin = GPIO_Pin_9;
+    hGPIOF.GPIO_PuPd = GPIO_PuPd_UP;
+    hGPIOF.GPIO_Speed = GPIO_Speed_2MHz;
+    GPIO_Init(GPIOF, &hGPIOF);
+    GPIO_ResetBits(GPIOF, GPIO_Pin_9);
 
     return;
 }
