@@ -149,7 +149,6 @@ int process_cmd(char* cmd, int cmd_len) {
 
 myos_STK LED_Stk[MYOS_TASK_STK_SIZE];
 void LED_task(void *arg) {
-    myos_log("LED_task Entry-->");
     while(1) {
         GPIO_SetBits(LED_PORT, LED_PIN);
         myos_TimeDly(1000);

@@ -22,8 +22,8 @@ all: $(objs)
 	@arm-none-eabi-gcc $(CFLAGS) -c $^ -o ./out/$@ $(BuildParams) $(IncludePath)
 
 flash: all
-#	@stm32flash -R -w $(TARGET).hex /dev/ttyUSB0
-	@stm32flash -i ',-rts,-dtr,:rts&dtr,-dtr,-rts,' -w $(TARGET).hex /dev/ttyUSB0
+	@stm32flash -i '-rts,:rts,' -w $(TARGET).hex /dev/ttyUSB0
+#	@stm32flash -i '-dtr,dtr,:-dtr,-rts' -w $(TARGET).hex /dev/ttyUSB0
 
 clean:
 	@rm out/*

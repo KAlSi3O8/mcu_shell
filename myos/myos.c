@@ -8,7 +8,7 @@ void myos_MemClr(INT8U *ptr, INT16U size) {
     }
 }
 
-INT8U myos_TCBInit(myos_STK *p_stk) {
+INT8U myos_TCBInit(myos_STK *p_stk, INT16U TCB_stat) {
     myos_TCB *ptcb;
     myos_CPU_SR cpu_sr = 0;
 
@@ -18,17 +18,23 @@ INT8U myos_TCBInit(myos_STK *p_stk) {
         myosTCBFreeList = ptcb->myosTCBNext;
         ptcb->myosTCBStkPtr = p_stk;
         ptcb->myosTCBDly = 0u;
-        ptcb->myosTCBStat = MYOS_STAT_RDY;
+        ptcb->myosTCBStat = TCB_stat;
 
-        ptcb->myosTCBPrev = myosTCBList;
-        ptcb->myosTCBNext = 0u;
-        if(myosTCBList != 0u) {
-            myosTCBList->myosTCBNext = ptcb;
+        if(TCB_stat == MYOS_STAT_IDLE) {
+            ptcb->myosTCBPrev = 0u;
+            ptcb->myosTCBNext = 0u;
+            myosTCBIdle = ptcb;
+        } else {
+            ptcb->myosTCBPrev = myosTCBListTail;
+            ptcb->myosTCBNext = 0u;
+            if(myosTCBListTail != 0u) {
+                myosTCBListTail->myosTCBNext = ptcb;
+            }
+            if(myosTCBListEntry == 0u) {
+                myosTCBListEntry = ptcb;
+            }
+            myosTCBListTail = ptcb;
         }
-        if(myosTCBListEntry == 0u) {
-            myosTCBListEntry = ptcb;
-        }
-        myosTCBList = ptcb;
         MYOS_EXIT_CRITICAL();
         return MYOS_ERR_NONE;
     }
@@ -63,19 +69,42 @@ myos_STK *myos_TaskStkInit(  void (*task)(void *p_arg),
 }
 
 void myos_SchedNew(void) {
-//save last TCB
-    if(myosTCBList != myosTCBCur) {
-        myosTCBList->myosTCBNext = myosTCBCur;
-        myosTCBCur->myosTCBPrev = myosTCBList;
-        myosTCBList = myosTCBCur;
+    // save last TCB
+    if(myosTCBCur != 0u) {
+        if(myosTCBCur->myosTCBStat == MYOS_STAT_RDY) {
+            myosTCBCur->myosTCBPrev = myosTCBListTail;
+            if(myosTCBListTail != 0u) {
+                myosTCBListTail->myosTCBNext = myosTCBCur;
+            }
+            myosTCBListTail = myosTCBCur;
+            if(myosTCBListEntry == 0) {
+                myosTCBListEntry = myosTCBCur;
+            }
+        }
+        else if(myosTCBCur->myosTCBStat == MYOS_STAT_SUS) {
+            myosTCBCur->myosTCBNext = myosTCBSusList;
+            myosTCBCur->myosTCBPrev = 0u;
+            if(myosTCBSusList != 0) {
+                myosTCBSusList->myosTCBPrev = myosTCBCur;
+            }
+            myosTCBSusList = myosTCBCur;
+        }
     }
 
-//get next TCB
-    myosTCBHighRdy = myosTCBListEntry;
-    if(myosTCBHighRdy->myosTCBNext != 0) {
+    // get next TCB
+    if(myosTCBListEntry != 0) {
+        myosTCBHighRdy = myosTCBListEntry;
         myosTCBListEntry = myosTCBHighRdy->myosTCBNext;
-        myosTCBListEntry->myosTCBPrev = 0u;
+        if(myosTCBListEntry != 0u) {
+            myosTCBListEntry->myosTCBPrev = 0u;
+        } else {
+            // the head is empty so the tail must be empty
+            myosTCBListTail = 0u;
+        }
         myosTCBHighRdy->myosTCBNext = 0u;
+        myosTCBHighRdy->myosTCBPrev = 0u;
+    } else {
+        myosTCBHighRdy = myosTCBIdle;
     }
 }
 
@@ -84,6 +113,7 @@ void myos_Sched(void) {
 
     MYOS_ENTER_CRITICAL();
     myos_SchedNew();
+    SysTick->CTRL;
     if(myosTCBHighRdy != myosTCBCur) {
         MYOS_TASK_SW();
     }
@@ -97,7 +127,7 @@ INT8U myos_TaskCreate( void (*task)(void *p_arg),
     INT8U err;
 
     psp = myos_TaskStkInit(task, p_arg, p_stk);
-    err = myos_TCBInit(psp);
+    err = myos_TCBInit(psp, MYOS_STAT_RDY);
     if(err == MYOS_ERR_NONE) {
         if(myosRunning == MYOS_TRUE) {
             myos_Sched();
@@ -106,31 +136,42 @@ INT8U myos_TaskCreate( void (*task)(void *p_arg),
     return err;
 }
 
+INT8U myos_IdleTaskCreate( void (*task)(void *p_arg),
+                        void *p_arg,
+                        myos_STK *p_stk) {
+    myos_STK *psp;
+    INT8U err;
+
+    psp = myos_TaskStkInit(task, p_arg, p_stk);
+    err = myos_TCBInit(psp, MYOS_STAT_IDLE);
+    return err;
+}
+
 void myos_InitTCBList(void) {
     INT8U i;
 
-    myos_MemClr((INT8U *)&myosTCBTbl[0], sizeof(myosTCBTbl));
+    myos_MemClr((INT8U * )&myosTCBTbl[0], sizeof(myosTCBTbl));
 
     for(i = 0u; i < MYOS_MAX_TASKS - 1u; i++) {
         myosTCBTbl[i].myosTCBNext = &myosTCBTbl[i + 1u];
     }
     myosTCBTbl[i].myosTCBNext = 0u;
 
-    myosTCBList = 0u;
+    myosTCBListTail = 0u;
+    myosTCBListEntry = 0u;
     myosTCBSusList = 0u;
     myosTCBFreeList = &myosTCBTbl[0];
 }
 
 void myos_TaskIdle (void *p_arg) {
     (void)p_arg;                                 /* Prevent compiler warning for not using 'p_arg'     */
-    myos_log("myos_TaskIdle Entry-->");
     for (;;) {
     }
 }
 
 void myos_InitTaskIdle(void) {
     NVIC_SetPriority(PendSV_IRQn, (1UL << __NVIC_PRIO_BITS) - 1UL);
-    (void)myos_TaskCreate(myos_TaskIdle, (void *)0, &myosTaskIdleStk[MYOS_TASK_IDLE_STK_START]);
+    (void)myos_IdleTaskCreate(myos_TaskIdle, (void *)0, &myosTaskIdleStk[MYOS_TASK_IDLE_STK_START]);
 }
 
 void myos_InitSystick(void) {
@@ -140,6 +181,7 @@ void myos_InitSystick(void) {
 void myos_Init(void) {
     myosRunning = MYOS_FALSE;
     myosTime = 0u;
+    myosTCBIdle = (myos_TCB *)0u;
     myosTCBCur = (myos_TCB *)0u;
     myosTCBHighRdy = (myos_TCB *)0u;
     myos_InitTCBList();
@@ -149,7 +191,7 @@ void myos_Init(void) {
 void myos_Start(void) {
     if(myosRunning == MYOS_FALSE) {
         myos_SchedNew();
-        // myos_InitSystick();
+        myos_InitSystick();
         myosStartHighRdy();
     }
 }
@@ -159,12 +201,8 @@ void myos_TimeDly(INT16U ticks) {
 
     if(ticks > 0u) {
         MYOS_ENTER_CRITICAL();
-        if(myosTCBSusList != 0) {
-            myosTCBCur->myosTCBNext = myosTCBSusList;
-            myosTCBCur->myosTCBPrev = 0u;
-            myosTCBSusList->myosTCBPrev = myosTCBCur;
-        }
         myosTCBCur->myosTCBDly = ticks;
+        myosTCBCur->myosTCBStat = MYOS_STAT_SUS;
         MYOS_EXIT_CRITICAL();
         myos_Sched();
     }
@@ -172,33 +210,45 @@ void myos_TimeDly(INT16U ticks) {
 
 void SysTick_Handler(void) {
     myos_TCB *ptcb;
-    myos_TCB *ptcbh;
-    myos_CPU_SR cpu_sr = 0;
+    myos_TCB *ptcb_prev;
+    myos_TCB *ptcb_next;
 
-    myos_log("SysTick Handler Entry-->");
     if(myosRunning == 1) {
-        MYOS_ENTER_CRITICAL();
         myosTime++;
         ptcb = myosTCBSusList;
         while(ptcb != 0u) {
             ptcb->myosTCBDly--;
             if(ptcb->myosTCBDly == 0u) {
-                ptcbh = ptcb->myosTCBPrev;
-                ptcb->myosTCBStat &= ~MYOS_STAT_SUS;
-                ptcbh->myosTCBNext = ptcb->myosTCBNext;
-                ptcb->myosTCBNext->myosTCBPrev = ptcbh;
-                ptcb->myosTCBPrev = myosTCBList;
-                ptcb->myosTCBNext = 0u;
-                if(myosTCBList != 0u) {
-                    myosTCBList->myosTCBNext = ptcb;
+                // take tcb away from suspend list
+                ptcb_prev = ptcb->myosTCBPrev;
+                ptcb_next = ptcb->myosTCBNext;
+                if(ptcb_prev != 0u) {
+                    ptcb_prev->myosTCBNext = ptcb_next;
+                } else {
+                    // the head of suspend list leave, move the head to the next one
+                    myosTCBSusList = ptcb_next;
                 }
-                myosTCBList = ptcb;
-                ptcb = ptcbh;
+                if(ptcb_next != 0u) {
+                    ptcb_next->myosTCBPrev = ptcb_prev;
+                }
+                // return tcb to ready list
+                ptcb->myosTCBStat = MYOS_STAT_RDY;
+                ptcb->myosTCBPrev = myosTCBListTail;
+                ptcb->myosTCBNext = 0u;
+                if(myosTCBListTail != 0u) {
+                    myosTCBListTail->myosTCBNext = ptcb;
+                }
+                myosTCBListTail = ptcb;
+                if(myosTCBListEntry == 0) {
+                    myosTCBListEntry = ptcb;
+                }
+                // next suspend task
+                ptcb = ptcb_next;
+                continue;
             }
             ptcb = ptcb->myosTCBNext;
         }
         myos_Sched();
-        myosCtxSw();
-        MYOS_EXIT_CRITICAL();
+        MYOS_TASK_SW();
     }
 }
