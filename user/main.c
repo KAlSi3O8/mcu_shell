@@ -158,7 +158,6 @@ void LED_task(void *arg) {
 }
 
 int main(void) {
-    int32_t ready_slot;
     system_start();
 
     myos_Init();
