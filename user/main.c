@@ -8,16 +8,8 @@
 #include "myDriver_uart.h"
 
 #define LED_PORT GPIOF
-#define LED_PIN  GPIO_Pin_9
+#define LED_PIN  GPIO_Pin_9 | GPIO_Pin_10
 #define LED_CLK  RCC_AHB1ENR_GPIOFEN
-
-void delay_ms(uint32_t time) {
-    uint32_t cnt;
-    while(time--) {
-        for(cnt = 10000; cnt > 0; cnt--);
-    }
-    return;
-}
 
 void system_start(void) {
     GPIO_InitTypeDef hLED;
@@ -147,13 +139,27 @@ int process_cmd(char* cmd, int cmd_len) {
     return ret;
 }
 
-myos_STK LED_Stk[MYOS_TASK_STK_SIZE];
-void LED_task(void *arg) {
+myos_STK LED1_Stk[MYOS_TASK_STK_SIZE];
+void LED1_task(void *arg) {
     while(1) {
-        GPIO_SetBits(LED_PORT, LED_PIN);
-        myos_TimeDly(1000);
-        GPIO_ResetBits(LED_PORT, LED_PIN);
-        myos_TimeDly(1000);
+        GPIO_SetBits(LED_PORT, GPIO_Pin_9);
+        myos_TimeDly(700);
+        GPIO_ResetBits(LED_PORT, GPIO_Pin_9);
+        myos_TimeDly(900);
+    }
+}
+
+myos_STK LED2_Stk[MYOS_TASK_STK_SIZE];
+void LED2_task(void *arg) {
+    while(1) {
+        GPIO_SetBits(LED_PORT, GPIO_Pin_10);
+        myos_TimeDly(100);
+        GPIO_ResetBits(LED_PORT, GPIO_Pin_10);
+        myos_TimeDly(200);
+        GPIO_SetBits(LED_PORT, GPIO_Pin_10);
+        myos_TimeDly(100);
+        GPIO_ResetBits(LED_PORT, GPIO_Pin_10);
+        myos_TimeDly(1300);
     }
 }
 
@@ -161,7 +167,8 @@ int main(void) {
     system_start();
 
     myos_Init();
-    myos_TaskCreate(&LED_task, (void *)0, &LED_Stk[MYOS_TASK_STK_START]);
+    myos_TaskCreate(&LED1_task, (void *)0, &LED1_Stk[MYOS_TASK_STK_START]);
+    myos_TaskCreate(&LED2_task, (void *)0, &LED2_Stk[MYOS_TASK_STK_START]);
     myos_Start();
     while(1);
 }
