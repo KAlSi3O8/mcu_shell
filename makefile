@@ -8,21 +8,22 @@ VPATH := ./lib/src/
 VPATH += ./core/
 VPATH += ./user/
 VPATH += ./myos/
+CFLAGS += -g -Og
 objs := $(addsuffix .o, $(basename $(notdir $(shell find -name "*.[c|s]"))))
 
 all: $(objs)
-	@arm-none-eabi-gcc -o out/$(TARGET).elf out/*.o $(LinkParams)
+	@arm-none-eabi-gcc $(CFLAGS) -o out/$(TARGET).elf out/*.o $(LinkParams)
 	@arm-none-eabi-objcopy out/$(TARGET).elf -Oihex $(TARGET).hex
 
 %.o: %.c
-	@arm-none-eabi-gcc -c $^ -o ./out/$@ $(BuildParams) $(IncludePath)
+	@arm-none-eabi-gcc $(CFLAGS) -c $^ -o ./out/$@ $(BuildParams) $(IncludePath)
 
 %.o: %.s
-	@arm-none-eabi-gcc -c $^ -o ./out/$@ $(BuildParams) $(IncludePath)
+	@arm-none-eabi-gcc $(CFLAGS) -c $^ -o ./out/$@ $(BuildParams) $(IncludePath)
 
-flash:
-	@stm32flash -w $(TARGET).hex /dev/ttyUSB0
-#	@stm32flash -R -i -dtr,dtr,:-dtr,-rts -w $(TARGET).hex /dev/ttyUSB0
+flash: all
+#	@stm32flash -R -w $(TARGET).hex /dev/ttyUSB0
+	@stm32flash -i ',-rts,-dtr,:rts&dtr,-dtr,-rts,' -w $(TARGET).hex /dev/ttyUSB0
 
 clean:
 	@rm out/*
@@ -32,3 +33,4 @@ debug:
 	@echo objs is $(objs)
 	@echo VPATH is $(VPATH)
 	@echo CFLAGS is $(CFLAGS)
+	@arm-none-eabi-gcc $(CFLAGS) -o out/$(TARGET).bin out/*.o $(LinkParams)

@@ -86,11 +86,10 @@ void usart1_init(void) {
     USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
 
 // Config UART RX NVIC
-    NVIC_SetPriorityGrouping(NVIC_PriorityGroup_0);
     hNVIC.NVIC_IRQChannel = USART1_IRQn;
     hNVIC.NVIC_IRQChannelCmd = ENABLE;
     hNVIC.NVIC_IRQChannelPreemptionPriority = 0;
-    hNVIC.NVIC_IRQChannelSubPriority = 15;
+    hNVIC.NVIC_IRQChannelSubPriority = 14;
     NVIC_Init(&hNVIC);
 
 // Initing RX buf

@@ -4,7 +4,12 @@
 #include <string.h>
 
 #include "myos.h"
+#include "myos_log.h"
 #include "myDriver_uart.h"
+
+#define LED_PORT GPIOF
+#define LED_PIN  GPIO_Pin_9
+#define LED_CLK  RCC_AHB1ENR_GPIOFEN
 
 void delay_ms(uint32_t time) {
     uint32_t cnt;
@@ -15,16 +20,20 @@ void delay_ms(uint32_t time) {
 }
 
 void system_start(void) {
-    GPIO_InitTypeDef hGPIOF;
-    RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_GPIOFEN, ENABLE);
+    GPIO_InitTypeDef hLED;
+    RCC_AHB1PeriphClockCmd(LED_CLK, ENABLE);
 
-    hGPIOF.GPIO_Mode = GPIO_Mode_OUT;
-    hGPIOF.GPIO_OType = GPIO_OType_PP;
-    hGPIOF.GPIO_Pin = GPIO_Pin_9;
-    hGPIOF.GPIO_PuPd = GPIO_PuPd_UP;
-    hGPIOF.GPIO_Speed = GPIO_Speed_2MHz;
-    GPIO_Init(GPIOF, &hGPIOF);
-    GPIO_ResetBits(GPIOF, GPIO_Pin_9);
+    hLED.GPIO_Mode = GPIO_Mode_OUT;
+    hLED.GPIO_OType = GPIO_OType_PP;
+    hLED.GPIO_Pin = LED_PIN;
+    hLED.GPIO_PuPd = GPIO_PuPd_UP;
+    hLED.GPIO_Speed = GPIO_Speed_2MHz;
+    GPIO_Init(LED_PORT, &hLED);
+    GPIO_ResetBits(LED_PORT, LED_PIN);
+
+    NVIC_SetPriorityGrouping(NVIC_PriorityGroup_0);
+
+    usart1_init();
 
     return;
 }
@@ -56,7 +65,7 @@ int devmem(char* args) {
     tmp = (char*)malloc(arg_len + 1);
     memset(tmp, 0, arg_len + 1);
     strncpy(tmp, arg, arg_len);
-    addr = strtoul(tmp+2, NULL, 16);
+    addr = (__IO uint32_t*)strtoul(tmp+2, NULL, 16);
     free(tmp);
 
     arg = args;
@@ -64,7 +73,7 @@ int devmem(char* args) {
     if(arg_len == 0) {
         tmp = (char*)malloc(64);
         memset(tmp, 0, 64);
-        sprintf(tmp, "Value in 0x%08x is 0x%08x(%u)\r\n", addr, *addr, *addr);
+        sprintf(tmp, "Value in 0x%08p is 0x%08lx(%lu)\r\n", addr, *addr, *addr);
         usart1_sendstr(tmp);
         free(tmp);
         return 0;
@@ -91,7 +100,7 @@ int devmem(char* args) {
 
         tmp = (char*)malloc(64);
         memset(tmp, 0, 64);
-        sprintf(tmp, "Wrote 0x%08x(%u) to 0x%08x\r\n", val, val, addr);
+        sprintf(tmp, "Wrote 0x%08lx(%lu) to 0x%08p\r\n", val, val, addr);
         usart1_sendstr(tmp);
         free(tmp);
         *addr = val;
@@ -138,11 +147,23 @@ int process_cmd(char* cmd, int cmd_len) {
     return ret;
 }
 
+myos_STK LED_Stk[MYOS_TASK_STK_SIZE];
+void LED_task(void *arg) {
+    myos_log("LED_task Entry-->");
+    while(1) {
+        GPIO_SetBits(LED_PORT, LED_PIN);
+        myos_TimeDly(1000);
+        GPIO_ResetBits(LED_PORT, LED_PIN);
+        myos_TimeDly(1000);
+    }
+}
+
 int main(void) {
     int32_t ready_slot;
     system_start();
 
     myos_Init();
+    myos_TaskCreate(&LED_task, (void *)0, &LED_Stk[MYOS_TASK_STK_START]);
     myos_Start();
     while(1);
 }

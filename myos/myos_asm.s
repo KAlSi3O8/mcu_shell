@@ -10,28 +10,31 @@
 .global myosStartHighRdy
 .global myosCtxSw
 .global PendSV_Handler
+.global HardFault_Handler
 
 .extern myosRunning
 .extern myosTCBCur
 .extern myosTCBHighRdy
 
 .text
-    .align 3
 
+.type  myosCPUSaveSR, %function
 myosCPUSaveSR:
     MOV     R1, #0x00000001
     MRS     R0, PRIMASK
     MSR     PRIMASK, R1
     BX      LR
 
+.type  myosCPURestoreSR, %function
 myosCPURestoreSR:
     MSR     PRIMASK, R0
     BX      LR
 
+.type  myosStartHighRdy, %function
 myosStartHighRdy:
     PUSH    {R0,R1,LR}
     CPSID   I
-    LDR     R0, =myosRunning
+    LDR     R0, =myosRunning    @Set myosRunning to myos_TRUE
     MOV     R1, #0x01
     STR     R1, [R0]
     
@@ -42,6 +45,7 @@ myosStartHighRdy:
     POP     {R0,R1,LR}
     BX      LR
 
+.type  myosCtxSw, %function
 myosCtxSw:                      @To trigger PendSV for real context switch
     PUSH    {R0,R1}
     LDR     R0, =SCB_ICSR_ADDR
@@ -51,6 +55,8 @@ myosCtxSw:                      @To trigger PendSV for real context switch
     POP     {R0,R1}
     BX      LR
 
+.section .text.PendSV_Handler
+    .type  PendSV_Handler, %function
 PendSV_Handler:
     CPSID   I
     MRS     R0, PSP             @If PSP is empty means have no task running skip saving
@@ -61,7 +67,7 @@ PendSV_Handler:
     LDR     R1, =myosTCBCur
     LDR     R2, [R1]
     STR     R0, [R2]            @update sp to TCB
-    
+
 LOAD:
     LDR     R0, =myosTCBCur
     LDR     R1, =myosTCBHighRdy
@@ -76,3 +82,4 @@ LOAD:
     ORR     LR, LR, #0x04       @Return to PSP
     CPSIE   I
     BX      LR
+    .size  PendSV_Handler, .-PendSV_Handler
