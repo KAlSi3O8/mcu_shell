@@ -29,6 +29,22 @@ void system_start(void) {
     return;
 }
 
+void MCO1_Init(void) {
+    GPIO_InitTypeDef hGPIOA;
+    RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_GPIOAEN, ENABLE);
+
+    // Config PA8 as MCO
+    GPIO_PinAFConfig(GPIOA, GPIO_Pin_8, GPIO_AF_MCO);
+    hGPIOA.GPIO_Mode = GPIO_Mode_AF;
+    hGPIOA.GPIO_OType = GPIO_OType_PP;
+    hGPIOA.GPIO_Pin = GPIO_Pin_8;
+    hGPIOA.GPIO_PuPd = GPIO_PuPd_NOPULL;
+    hGPIOA.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOA, &hGPIOA);
+
+    RCC_MCO1Config(RCC_MCO1Source_PLLCLK, RCC_MCO1Div_4);
+}
+
 int get_token_size(char** str) {
     int size = 0;
     while(*(*str) != ' ' && *(*str) != '\r') {
@@ -142,6 +158,7 @@ int main(void) {
     int32_t ready_slot;
     system_start();
 
+    MCO1_Init();
     usart1_init();
     while(1) {
         ready_slot = usart1_get_ready_slot();
