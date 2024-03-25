@@ -87,6 +87,17 @@ uint8_t SCCB_ReadByte(void) {
     return byte;
 }
 
+void SCCB_WriteReg(uint8_t addr, uint8_t reg, uint8_t val) {
+    uint8_t ack = 0;
+
+    // 3 Phase Write
+    SCCB_Start();
+    ack = SCCB_WriteByte(addr & ~0x01);
+    ack = SCCB_WriteByte(reg);
+    ack = SCCB_WriteByte(val);
+    SCCB_Stop();
+}
+
 uint8_t SCCB_ReadReg(uint8_t addr, uint8_t reg) {
     uint8_t ack = 0;
 
