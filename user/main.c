@@ -7,23 +7,8 @@
 #include "myDriver_uart.h"
 #include "myDriver_tim.h"
 #include "myDriver_sccb.h"
+#include "myDriver_system.h"
 #include "myApp.h"
-
-void MCO1_Init(void) {
-    GPIO_InitTypeDef hGPIOA;
-    RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_GPIOAEN, ENABLE);
-
-    // Config PA8 as MCO
-    GPIO_PinAFConfig(GPIOA, GPIO_PinSource8, GPIO_AF_MCO);
-    hGPIOA.GPIO_Mode = GPIO_Mode_AF;
-    hGPIOA.GPIO_OType = GPIO_OType_PP;
-    hGPIOA.GPIO_Pin = GPIO_Pin_8;
-    hGPIOA.GPIO_PuPd = GPIO_PuPd_NOPULL;
-    hGPIOA.GPIO_Speed = GPIO_Speed_25MHz;
-    GPIO_Init(GPIOA, &hGPIOA);
-
-    RCC_MCO1Config(RCC_MCO1Source_HSI, RCC_MCO1Div_1);
-}
 
 int main(void) {
     int32_t ready_slot;
@@ -31,7 +16,7 @@ int main(void) {
     system_start();
 
     TIM6_Init();
-    MCO1_Init();
+    MCO2_Init();
     SCCB_Init();
     UART1_Init();
 
