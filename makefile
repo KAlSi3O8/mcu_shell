@@ -1,5 +1,5 @@
 TARGET := mcu_shell
-BuildParams := -w -mthumb -mcpu=cortex-m4 -DSTM32F40_41xxx -DUSE_STDPERIPH_DRIVER -DHSE_VALUE=8000000
+BuildParams := -g -O0 -w -mthumb -mcpu=cortex-m4 -DSTM32F40_41xxx -DUSE_STDPERIPH_DRIVER -DHSE_VALUE=8000000
 LinkParams := -mthumb -mcpu=cortex-m4 -T $(shell find -name "*.ld") -specs=nosys.specs -static -Wl,-cref,-u,Reset_Handler -Wl,-Map=out/$(TARGET).map -Wl,--gc-sections -Wl,--defsym=malloc_getpagesize_P=0x80 -Wl,--start-group -lc -lm -Wl,--end-group
 IncludePath := -Ilib/inc/
 IncludePath += -Icore/
@@ -18,8 +18,8 @@ all: $(objs)
 %.o: %.s
 	@arm-none-eabi-gcc -c $^ -o ./out/$@ $(BuildParams) $(IncludePath)
 
-flash:
-	@stm32flash -i '-rts,:rts,' -w $(TARGET).hex /dev/ttyUSB0
+flash: all
+	@stm32flash -i '-rts,,:rts,,' -w $(TARGET).hex /dev/ttyUSB0
 #	@stm32flash -i '-dtr,dtr,:-dtr,-rts' -w $(TARGET).hex /dev/ttyUSB0
 
 clean:

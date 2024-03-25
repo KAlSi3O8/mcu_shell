@@ -1,8 +1,16 @@
 #include <stm32f4xx_conf.h>
 #include <string.h>
+#include <stdio.h>
 #include "myDriver_uart.h"
 
 struct _uart_dual_buf uart1_dual_buf;
+
+/*
+ * re-define _write for printf()
+ */
+int _write(int fd, char *ptr, int len) {
+    return UART1_SendnStr(ptr, len);
+}
 
 /**
  * @brief   set current usart1 buf slot
@@ -11,7 +19,7 @@ struct _uart_dual_buf uart1_dual_buf;
  * @retval  -2: slot has not been read, data may overwrite
  * @retval  0: set slot success
 */
-int32_t usart1_set_slot(uint8_t slot) {
+int32_t UART1_SetSlot(uint8_t slot) {
     if(slot != SLOT_A && SLOT_B != 1) {
         return -1;
     }
@@ -27,7 +35,7 @@ int32_t usart1_set_slot(uint8_t slot) {
  * @retval  -1: slot has not been read, data may overwrite
  * @retval  0: switch slot success
 */
-int32_t usart1_switch_slot(void) {
+int32_t UART1_SwitchSlot(void) {
     // set slot ready to read flag
     uart1_dual_buf.slot_flag |= SLOT_MSK(uart1_dual_buf.slot_num);
     // save data len of current slot
@@ -48,7 +56,7 @@ int32_t usart1_switch_slot(void) {
  * @retval  -1: no buffer is ready
  * @retval  0: ret buffer is ready to read
 */
-int32_t usart1_get_ready_slot(void) {
+int32_t UART1_GetReadySlot(void) {
     uint8_t ready_slot;
     ready_slot = uart1_dual_buf.slot_num ? SLOT_A : SLOT_B;
     if((uart1_dual_buf.slot_flag & SLOT_MSK(ready_slot)) == 0) {
@@ -60,7 +68,7 @@ int32_t usart1_get_ready_slot(void) {
 /**
  * @brief   init usart1 clock/gpio/interrup and enable usart1
 */
-void usart1_init(void) {
+void UART1_Init(void) {
     GPIO_InitTypeDef hGPIOA;
     USART_InitTypeDef hUSART1;
     NVIC_InitTypeDef hNVIC;
@@ -103,29 +111,29 @@ void usart1_init(void) {
 /**
  * @brief   send str to usart1
  * @param   str: message to be sent
- * @retval  None
+ * @retval  total bytes have sent
  */
-void usart1_sendstr(char *str) {
+int UART1_SendStr(char *str) {
     int len = strlen(str);
     for(int i = 0; i < len; i++) {
         USART_SendData(USART1, str[i]);
         while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
     }
-    return;
+    return len;
 }
 
 /**
  * @brief   send n bytes of str to usart1
  * @param   str: message to be sent
  * @param   n: number of bytes to send
- * @retval  None
+ * @retval  total bytes have sent
  */
-void usart1_sendnstr(char *str, uint32_t n) {
+int  UART1_SendnStr(char *str, uint32_t n) {
     for(int i = 0; i < n; i++) {
         USART_SendData(USART1, str[i]);
         while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
     }
-    return;
+    return n;
 }
 
 void USART1_IRQHandler(void) {
@@ -149,7 +157,7 @@ void USART1_IRQHandler(void) {
             USART_SendData(USART1, '\n');
             while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
             uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = 0;
-            usart1_switch_slot();
+            UART1_SwitchSlot();
         }
         USART_ClearITPendingBit(USART1, USART_IT_RXNE);
     }

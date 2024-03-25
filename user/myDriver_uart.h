@@ -1,5 +1,5 @@
-#ifndef __MYDRIVER_UART
-#define __MYDRIVER_UART
+#ifndef __MYDRIVER_UART_H
+#define __MYDRIVER_UART_H
 
 #define BUFFER_SIZE 256
 #define SLOT_SIZE   2
@@ -18,10 +18,10 @@ struct _uart_dual_buf {
 };
 extern struct _uart_dual_buf uart1_dual_buf;
 
-void usart1_init(void);
-void usart1_sendstr(char *str);
-void usart1_sendnstr(char *str, uint32_t n);
-int32_t usart1_get_ready_slot(void);
-int32_t usart1_set_slot(uint8_t slot);
+void UART1_Init(void);
+int UART1_SendStr(char *str);
+int UART1_SendnStr(char *str, uint32_t n);
+int32_t UART1_GetReadySlot(void);
+int32_t UART1_SetSlot(uint8_t slot);
 
 #endif
