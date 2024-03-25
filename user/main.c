@@ -163,12 +163,25 @@ void LED2_task(void *arg) {
     }
 }
 
+myos_STK MCU_Shell_Stk[MYOS_TASK_STK_SIZE];
+void MCU_Shell_task(void *arg) {
+    int ready_slot;
+    while(1) {
+        ready_slot = usart1_get_ready_slot();
+        if(ready_slot != -1) {
+            process_cmd(uart1_dual_buf.buf[ready_slot], uart1_dual_buf.buf_len[ready_slot]);
+            uart1_dual_buf.slot_flag &= ~SLOT_MSK(ready_slot);
+        }
+    }
+}
+
 int main(void) {
     system_start();
 
     myos_Init();
     myos_TaskCreate(&LED1_task, (void *)0, &LED1_Stk[MYOS_TASK_STK_START]);
     myos_TaskCreate(&LED2_task, (void *)0, &LED2_Stk[MYOS_TASK_STK_START]);
+    myos_TaskCreate(&MCU_Shell_task, (void *)0, &MCU_Shell_Stk[MYOS_TASK_STK_START]);
     myos_Start();
     while(1);
 }
