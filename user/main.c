@@ -9,29 +9,25 @@
 #include "myDriver_sccb.h"
 #include "myDriver_system.h"
 #include "myApp.h"
+#include "myOV7670.h"
 
 int main(void) {
     int32_t ready_slot;
     uint8_t PID = 0;
     system_start();
 
+    UART1_Init();
     TIM6_Init();
     MCO2_Init();
     SCCB_Init();
-    UART1_Init();
+    OV7670_SoftReset();
+    OV7670_Init();
 
-    delay_ms(5);
-    PID = SCCB_ReadReg(0x42, 0x0A);
-    printf("PID: 0x%X\r\n", PID);
-    PID = SCCB_ReadReg(0x42, 0x0B);
-    printf("VER: 0x%X\r\n", PID);
+    printf("PID = 0x%4X\r\n", OV7670_GetPID());
+    printf("MID = 0x%4X\r\n", OV7670_GetMID());
 
-    while(1) {
-        D1_OFF();
-        delay_ms(1000);
-        D1_ON();
-        delay_ms(1000);
-    }
+    delay_ms(2000);
+    DCMI_CaptureCmd(ENABLE);
 
     while(1) {
         ready_slot = UART1_GetReadySlot();
