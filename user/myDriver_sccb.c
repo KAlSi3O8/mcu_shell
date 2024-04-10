@@ -10,13 +10,10 @@
 
 void SCCB_Init(void) {
     GPIO_InitTypeDef hGPIOB;
-    I2C_InitTypeDef hI2C1;
     
     RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_GPIOBEN, ENABLE);
 
     // Config PB8 as SCL, PB9 as SDA
-    GPIO_PinAFConfig(GPIOB, GPIO_PinSource8, GPIO_AF_I2C1);
-    GPIO_PinAFConfig(GPIOB, GPIO_PinSource9, GPIO_AF_I2C1);
     hGPIOB.GPIO_Mode =  GPIO_Mode_OUT;
     hGPIOB.GPIO_OType = GPIO_OType_OD;
     hGPIOB.GPIO_Pin =   GPIO_Pin_8 | GPIO_Pin_9;

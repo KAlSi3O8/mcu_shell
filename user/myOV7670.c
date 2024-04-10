@@ -3,8 +3,10 @@
 #include <stdio.h>
 #include "myDriver_sccb.h"
 #include "myDriver_tim.h"
+#include "mySSD1306.h"
 
 #define OV7670_ADDR 0x42
+#define OV7670_BUF_SIZE     3072
 
 #define COM7    0x12
 #define PID     0x0A
@@ -12,7 +14,10 @@
 #define MIDH    0x1C
 #define MIDL    0x1D
 
-uint8_t OV7670_Buf[3072][2] = {0};
+struct s_YCbCr {
+    uint8_t CbCr;
+    uint8_t Y;
+} OV7670_Buf[OV7670_BUF_SIZE] = {0};
 
 uint16_t OV7670_GetMID(void) {
     uint16_t MID = 0;
@@ -44,7 +49,7 @@ int OV7670_SoftReset(void) {
     SCCB_WriteReg(OV7670_ADDR, 0x1A, 0x45);
     SCCB_WriteReg(OV7670_ADDR, 0x03, 0x00);
 
-    SCCB_WriteReg(OV7670_ADDR, 0x11, 0x01);     // pre-scalar /4
+    // SCCB_WriteReg(OV7670_ADDR, 0x11, 0x01);     // pre-scalar /4
     SCCB_WriteReg(OV7670_ADDR, 0x12, 0x00);     // Output format YUV
 
     return 0;
@@ -53,7 +58,6 @@ int OV7670_SoftReset(void) {
 int OV7670_Init(void) {
     GPIO_InitTypeDef hGPIO;
     DCMI_InitTypeDef hDCMI;
-    // DCMI_CROPInitTypeDef hCROP;
     NVIC_InitTypeDef hNVIC;
     DMA_InitTypeDef  hDMA2;
 
@@ -118,12 +122,11 @@ int OV7670_Init(void) {
     hDMA2.DMA_MemoryBurst = DMA_MemoryBurst_Single;
     hDMA2.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
     DMA_Init(DMA2_Stream1, &hDMA2);
-    printf("NDT: %u\r\n", DMA_GetCurrDataCounter(DMA2_Stream1));
     DMA_Cmd(DMA2_Stream1, ENABLE);
 
     hNVIC.NVIC_IRQChannel = DCMI_IRQn;
     hNVIC.NVIC_IRQChannelPreemptionPriority = 0;
-    hNVIC.NVIC_IRQChannelSubPriority = 15;
+    hNVIC.NVIC_IRQChannelSubPriority = 10;
     hNVIC.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&hNVIC);
 
@@ -131,5 +134,20 @@ int OV7670_Init(void) {
 }
 
 void DCMI_IRQHandler(void) {
-    DCMI_ClearITPendingBit(DCMI_IT_FRAME);
+    if(DCMI_GetITStatus(DCMI_IT_FRAME)) {
+        DCMI_ClearITPendingBit(DCMI_IT_FRAME);
+        DMA_Cmd(DMA2_Stream1, DISABLE);
+        DMA_SetCurrDataCounter(DMA2_Stream1, 1536);
+        DMA_Cmd(DMA2_Stream1, ENABLE);
+        for(int y = 0; y < 48; y++) {
+            for(int x = 0; x < 64; x++) {
+                if(OV7670_Buf[x + y * 64].Y >= 0x80) {
+                    OLED_Data.GRAM[y/8][x] |= 1 << y%8;
+                } else {
+                    OLED_Data.GRAM[y/8][x] &= ~(1 << y%8);
+                }
+            }
+        }
+        OLED_Flush();
+    }
 }

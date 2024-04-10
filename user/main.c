@@ -6,10 +6,12 @@
 
 #include "myDriver_uart.h"
 #include "myDriver_tim.h"
+#include "myDriver_iic.h"
 #include "myDriver_sccb.h"
 #include "myDriver_system.h"
 #include "myApp.h"
 #include "myOV7670.h"
+#include "mySSD1306.h"
 
 int main(void) {
     int32_t ready_slot;
@@ -22,11 +24,10 @@ int main(void) {
     SCCB_Init();
     OV7670_SoftReset();
     OV7670_Init();
+    IIC_Init();
+    OLED_Init();
 
-    printf("PID = 0x%4X\r\n", OV7670_GetPID());
-    printf("MID = 0x%4X\r\n", OV7670_GetMID());
-
-    delay_ms(2000);
+    delay_ms(1000);
     DCMI_CaptureCmd(ENABLE);
 
     while(1) {
