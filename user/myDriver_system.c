@@ -32,7 +32,7 @@ void MCO2_Init(void) {
     hGPIOC.GPIO_Speed = GPIO_Speed_25MHz;
     GPIO_Init(GPIOC, &hGPIOC);
 
-    RCC_MCO1Config(RCC_MCO2Source_PLLI2SCLK, RCC_MCO2Div_3);
+    RCC_MCO2Config(RCC_MCO2Source_PLLI2SCLK, RCC_MCO2Div_3);
     RCC_PLLI2SConfig(72, 2);
     RCC_PLLI2SCmd(ENABLE);
     while(0 == RCC_GetFlagStatus(RCC_FLAG_PLLI2SRDY));

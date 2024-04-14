@@ -1,6 +1,9 @@
 #include <stm32f4xx_conf.h>
 #include <stm32f4xx.h>
 #include <stdlib.h>
+#include <string.h>
+#include "myDriver_uart.h"
+#include "myOV7670.h"
 
 void system_start(void) {
     GPIO_InitTypeDef hGPIOF;
@@ -95,6 +98,21 @@ int devmem(char* args) {
     return 0;
 }
 
+int setThreshold(char* args) {
+    int arg_len;
+    char *arg = args;
+
+    arg_len = get_token_size(&args);
+    if(arg_len == 0) {
+        UART1_SendStr("Usage: threshold value(0x00~0xFF)\r\n");
+        return 1;
+    }
+
+    grayThreshold = strtol(arg, NULL, 0);
+    printf("Gray threshold is set to %d\r\n", grayThreshold);
+    return 0;
+}
+
 int process_cmd(char* cmd, int cmd_len) {
     int ret = 0;
     int token_len;
@@ -105,22 +123,29 @@ int process_cmd(char* cmd, int cmd_len) {
         case 4:
             if(strncmp(token, "help", token_len) == 0) {
                 UART1_SendStr("mcu shell cmd:\r\n");
-                UART1_SendStr("devmem - show value of register\r\n");
+                UART1_SendStr("devmem - read/write value of register\r\n");
+                UART1_SendStr("threshold - set gray threshold value\r\n");
                 UART1_SendStr("help - show this info\r\n");
             } else {
-                UART1_SendStr("Unknown cmd\r\n");
-                UART1_SendStr("use \"help\" to show cmd info\r\n");
+                goto wrong;
             }
             break;
         case 6:
             if(strncmp(token, "devmem", token_len) == 0) {
                 ret = devmem(cmd);
             } else {
-                UART1_SendStr("Unknown cmd\r\n");
-                UART1_SendStr("use \"help\" to show cmd info\r\n");
+                goto wrong;
+            }
+            break;
+        case 9:
+            if(strncmp(token, "threshold", token_len) == 0) {
+                ret = setThreshold(cmd);
+            } else {
+                goto wrong;
             }
             break;
         default:
+            wrong:
             UART1_SendStr("Unknown cmd\r\n");
             UART1_SendStr("use \"help\" to show cmd info\r\n");
             break;

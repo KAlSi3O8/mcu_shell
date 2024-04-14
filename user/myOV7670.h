@@ -8,4 +8,6 @@ uint16_t OV7670_GetPID(void);
 int OV7670_SoftReset(void);
 int OV7670_Init(void);
 
+extern uint8_t grayThreshold;
+
 #endif

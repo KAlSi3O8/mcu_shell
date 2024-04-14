@@ -31,11 +31,19 @@ void OLED_nData(uint8_t *data, uint32_t len) {
 
 void OLED_Init(void) {
     OLED_nCmd(OLED_INITCMD, sizeof(OLED_INITCMD));
+    // OLED_SetSize(64, 48);
     OLED_Fill(0x00);
 }
 
+void OLED_SetSize(uint8_t width, uint8_t height) {
+    uint8_t cmd[6] = {0x21, 0x20, 0x00, 0x22, 0x00, 0x00};
+    cmd[2] = 0x1F + width;
+    cmd[5] = height == 0 ? 0 : (height - 1) / 8;
+    OLED_nCmd(cmd, sizeof(cmd));
+}
+
 void OLED_Fill(uint8_t byte) {
-    memset(OLED_Data.GRAM, byte, GRAM_SIZE);
+    memset(OLED_Data.GRAM, byte, GRAM_MAX_SIZE);
     OLED_nData((uint8_t *)&OLED_Data, sizeof(OLED_Data));
 }
 

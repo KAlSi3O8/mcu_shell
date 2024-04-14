@@ -5,9 +5,10 @@
 #include "myDriver_tim.h"
 #include "mySSD1306.h"
 
-#define OV7670_ADDR 0x42
-#define OV7670_BUF_SIZE     3072
-
+#define OV7670_ADDR         0x42
+#define OV7670_WIDTH        64
+#define OV7670_HEIGHT       48
+#define OV7670_BUF_SIZE     (OV7670_WIDTH * OV7670_HEIGHT)
 #define COM7    0x12
 #define PID     0x0A
 #define VER     0x0B
@@ -18,6 +19,7 @@ struct s_YCbCr {
     uint8_t CbCr;
     uint8_t Y;
 } OV7670_Buf[OV7670_BUF_SIZE] = {0};
+uint8_t grayThreshold = 0x80;
 
 uint16_t OV7670_GetMID(void) {
     uint16_t MID = 0;
@@ -33,6 +35,29 @@ uint16_t OV7670_GetPID(void) {
     return ID;
 }
 
+OV7670_SetSize(uint16_t width, uint16_t height) {
+    uint8_t Hstart;
+    uint8_t Hstop;
+    uint8_t Hlow;
+    uint8_t Vstart;
+    uint8_t Vstop;
+    uint8_t Vlow;
+
+    Hstart = 0x39 - width / 16;
+    Hstop  = 0x39 + width / 16;
+    Hlow   = (8 - ((width / 2) % 8)) & 0x7 | (((width / 2) % 8) & 0x7) << 3 | 0x80;
+    Vstart = 0x3F - height / 8;
+    Vstop  = 0x3F + height / 8;
+    Vlow   = (4 - ((height / 2) % 4)) & 0x3 | (((height / 2) % 4) & 0x3) << 2;
+
+    SCCB_WriteReg(OV7670_ADDR, 0x17, Hstart);
+    SCCB_WriteReg(OV7670_ADDR, 0x18, Hstop);
+    SCCB_WriteReg(OV7670_ADDR, 0x32, Hlow);
+    SCCB_WriteReg(OV7670_ADDR, 0x19, Vstart);
+    SCCB_WriteReg(OV7670_ADDR, 0x1A, Vstop);
+    SCCB_WriteReg(OV7670_ADDR, 0x03, Vlow);
+}
+
 int OV7670_SoftReset(void) {
     delay_ms(5);
     SCCB_WriteReg(OV7670_ADDR, COM7, 0x80);
@@ -42,15 +67,12 @@ int OV7670_SoftReset(void) {
         return -1;
     }
 
-    SCCB_WriteReg(OV7670_ADDR, 0x17, 0x35);     // set to 64x48
-    SCCB_WriteReg(OV7670_ADDR, 0x18, 0x3D);
-    SCCB_WriteReg(OV7670_ADDR, 0x32, 0x00);
-    SCCB_WriteReg(OV7670_ADDR, 0x19, 0x39);
-    SCCB_WriteReg(OV7670_ADDR, 0x1A, 0x45);
-    SCCB_WriteReg(OV7670_ADDR, 0x03, 0x00);
-
-    // SCCB_WriteReg(OV7670_ADDR, 0x11, 0x01);     // pre-scalar /4
+    OV7670_SetSize(OV7670_WIDTH * 8, OV7670_HEIGHT * 8);
+    SCCB_WriteReg(OV7670_ADDR, 0x0C, 0x04);     // Enable down sampling
     SCCB_WriteReg(OV7670_ADDR, 0x12, 0x00);     // Output format YUV
+    SCCB_WriteReg(OV7670_ADDR, 0x3E, 0x13);     // Enable down sampling PCLK control, set PCLK divider /4
+    SCCB_WriteReg(OV7670_ADDR, 0x72, 0x33);     // down sample /4
+    SCCB_WriteReg(OV7670_ADDR, 0x73, 0xF3);     // clock divider /4 (= PCLK divider)
 
     return 0;
 }
@@ -112,7 +134,7 @@ int OV7670_Init(void) {
     hDMA2.DMA_DIR = DMA_DIR_PeripheralToMemory;
     hDMA2.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
     hDMA2.DMA_MemoryInc = DMA_MemoryInc_Enable;
-    hDMA2.DMA_BufferSize = 1536;
+    hDMA2.DMA_BufferSize = OV7670_BUF_SIZE / 2;
     hDMA2.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Word;
     hDMA2.DMA_MemoryDataSize = DMA_MemoryDataSize_Word;
     hDMA2.DMA_Mode = DMA_Mode_Circular;
@@ -137,14 +159,14 @@ void DCMI_IRQHandler(void) {
     if(DCMI_GetITStatus(DCMI_IT_FRAME)) {
         DCMI_ClearITPendingBit(DCMI_IT_FRAME);
         DMA_Cmd(DMA2_Stream1, DISABLE);
-        DMA_SetCurrDataCounter(DMA2_Stream1, 1536);
+        DMA_SetCurrDataCounter(DMA2_Stream1, OV7670_BUF_SIZE / 2);
         DMA_Cmd(DMA2_Stream1, ENABLE);
-        for(int y = 0; y < 48; y++) {
-            for(int x = 0; x < 64; x++) {
-                if(OV7670_Buf[x + y * 64].Y >= 0x80) {
-                    OLED_Data.GRAM[y/8][x] |= 1 << y%8;
+        for(int y = 0; y < GRAM_HEIGHT; y++) {
+            for(int x = 0; x < GRAM_WIDTH; x++) {
+                if(OV7670_Buf[x + y * OV7670_WIDTH].Y >= grayThreshold) {
+                    OLED_Data.GRAM[y / 8][x] |= 1 << y % 8;
                 } else {
-                    OLED_Data.GRAM[y/8][x] &= ~(1 << y%8);
+                    OLED_Data.GRAM[y / 8][x] &= ~(1 << y % 8);
                 }
             }
         }
