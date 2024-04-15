@@ -18,8 +18,9 @@
 struct s_YCbCr {
     uint8_t CbCr;
     uint8_t Y;
-} OV7670_Buf[OV7670_BUF_SIZE] = {0};
-uint8_t grayThreshold = 0x80;
+} OV7670_Buf[OV7670_HEIGHT][OV7670_WIDTH] = {0};
+uint8_t OV7670_Layer[OV7670_HEIGHT][OV7670_WIDTH] = {0};
+uint8_t grayThreshold = 0x20;
 
 uint16_t OV7670_GetMID(void) {
     uint16_t MID = 0;
@@ -156,14 +157,44 @@ int OV7670_Init(void) {
 }
 
 void DCMI_IRQHandler(void) {
+    int tmp;
     if(DCMI_GetITStatus(DCMI_IT_FRAME)) {
         DCMI_ClearITPendingBit(DCMI_IT_FRAME);
         DMA_Cmd(DMA2_Stream1, DISABLE);
         DMA_SetCurrDataCounter(DMA2_Stream1, OV7670_BUF_SIZE / 2);
         DMA_Cmd(DMA2_Stream1, ENABLE);
-        for(int y = 0; y < GRAM_HEIGHT; y++) {
-            for(int x = 0; x < GRAM_WIDTH; x++) {
-                if(OV7670_Buf[x + y * OV7670_WIDTH].Y >= grayThreshold) {
+        // for(int y = 1; y < OV7670_HEIGHT - 2; y++) {
+        //     for(int x = 1; x < OV7670_WIDTH - 2; x++) {
+        //         tmp =   OV7670_Buf[y-1][x-1].Y +
+        //                 OV7670_Buf[y-1][x  ].Y +
+        //                 OV7670_Buf[y-1][x+1].Y +
+        //                 OV7670_Buf[y  ][x  ].Y +
+        //                 OV7670_Buf[y  ][x  ].Y +
+        //                 OV7670_Buf[y  ][x  ].Y +
+        //                 OV7670_Buf[y+1][x-1].Y +
+        //                 OV7670_Buf[y+1][x  ].Y +
+        //                 OV7670_Buf[y+1][x+1].Y;
+        //         OV7670_Layer[y][x] = tmp / 16;
+        //     }
+        // }
+        for(int y = 1; y < GRAM_HEIGHT - 2; y++) {
+            for(int x = 1; x < GRAM_WIDTH - 2; x++) {
+                tmp =   OV7670_Buf[y][x].Y*4 -
+                        OV7670_Buf[y-1][x].Y -
+                        OV7670_Buf[y][x-1].Y -
+                        OV7670_Buf[y][x+1].Y -
+                        OV7670_Buf[y+1][x].Y;
+                // tmp =   OV7670_Buf[y][x].Y*8 -
+                //         OV7670_Buf[y-1][x-1].Y -
+                //         OV7670_Buf[y-1][x  ].Y -
+                //         OV7670_Buf[y-1][x+1].Y -
+                //         OV7670_Buf[y  ][x-1].Y -
+                //         OV7670_Buf[y  ][x+1].Y -
+                //         OV7670_Buf[y+1][x-1].Y -
+                //         OV7670_Buf[y+1][x  ].Y -
+                //         OV7670_Buf[y+1][x+1].Y;
+                // tmp = OV7670_Buf[y][x].Y;
+                if(tmp >= grayThreshold) {
                     OLED_Data.GRAM[y / 8][x] |= 1 << y % 8;
                 } else {
                     OLED_Data.GRAM[y / 8][x] &= ~(1 << y % 8);
