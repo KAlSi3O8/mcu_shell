@@ -7,6 +7,7 @@ VPATH := ./lib/src/
 VPATH += ./core/
 VPATH += ./user/
 objs := $(addsuffix .o, $(basename $(notdir $(shell find . -name "*.[c|s]"))))
+system := $(shell uname)
 
 all: out $(objs)
 	@arm-none-eabi-gcc -o out/$(TARGET).elf out/*.o $(LinkParams)
@@ -24,7 +25,13 @@ endif
 	@arm-none-eabi-gcc -c $^ -o ./out/$@ $(BuildParams) $(IncludePath)
 
 flash: all
-	@stm32flash -i '-rts,,:rts,,' -w $(TARGET).hex /dev/ttyUSB0
+	@echo flash from $(system)
+ifeq ($(system),Linux)
+	@stm32flash -i '-rts,,:rts,,' -w $(TARGET).hex /dev/ttyUSB*
+endif
+ifeq ($(system),Darwin)
+	stm32flash -i  '-rts,,:rts,,' -w $(TARGET).hex /dev/tty.usbserial-*
+endif
 #	@stm32flash -i '-dtr,dtr,:-dtr,-rts' -w $(TARGET).hex /dev/ttyUSB0
 
 clean:
