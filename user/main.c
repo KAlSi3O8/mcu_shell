@@ -31,6 +31,10 @@ int main(void) {
     DCMI_CaptureCmd(ENABLE);
 
     while(1) {
+        // GPIO_SetBits(GPIOF, GPIO_Pin_9);
+        // delay_ms(1000);
+        // GPIO_ResetBits(GPIOF, GPIO_Pin_9);
+        // delay_ms(1000);
         ready_slot = UART1_GetReadySlot();
         if(ready_slot != -1) {
             process_cmd(uart1_dual_buf.buf[ready_slot], uart1_dual_buf.buf_len[ready_slot]);

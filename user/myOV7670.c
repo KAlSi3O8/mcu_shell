@@ -20,7 +20,7 @@ struct s_YCbCr {
     uint8_t Y;
 } OV7670_Buf[OV7670_HEIGHT][OV7670_WIDTH] = {0};
 uint8_t OV7670_Layer[OV7670_HEIGHT][OV7670_WIDTH] = {0};
-uint8_t grayThreshold = 0x20;
+uint8_t grayThreshold = 0x0a;
 
 uint16_t OV7670_GetMID(void) {
     uint16_t MID = 0;
@@ -68,12 +68,12 @@ int OV7670_SoftReset(void) {
         return -1;
     }
 
-    OV7670_SetSize(OV7670_WIDTH * 8, OV7670_HEIGHT * 8);
+    OV7670_SetSize(OV7670_WIDTH * 4, OV7670_HEIGHT * 4);
     SCCB_WriteReg(OV7670_ADDR, 0x0C, 0x04);     // Enable down sampling
     SCCB_WriteReg(OV7670_ADDR, 0x12, 0x00);     // Output format YUV
-    SCCB_WriteReg(OV7670_ADDR, 0x3E, 0x13);     // Enable down sampling PCLK control, set PCLK divider /4
-    SCCB_WriteReg(OV7670_ADDR, 0x72, 0x33);     // down sample /4
-    SCCB_WriteReg(OV7670_ADDR, 0x73, 0xF3);     // clock divider /4 (= PCLK divider)
+    SCCB_WriteReg(OV7670_ADDR, 0x3E, 0x12);     // Enable down sampling PCLK control, set PCLK divider /4
+    SCCB_WriteReg(OV7670_ADDR, 0x72, 0x22);     // down sample /4
+    SCCB_WriteReg(OV7670_ADDR, 0x73, 0xF2);     // clock divider /4 (= PCLK divider)
 
     return 0;
 }
@@ -163,27 +163,41 @@ void DCMI_IRQHandler(void) {
         DMA_Cmd(DMA2_Stream1, DISABLE);
         DMA_SetCurrDataCounter(DMA2_Stream1, OV7670_BUF_SIZE / 2);
         DMA_Cmd(DMA2_Stream1, ENABLE);
-        // for(int y = 1; y < OV7670_HEIGHT - 2; y++) {
-        //     for(int x = 1; x < OV7670_WIDTH - 2; x++) {
-        //         tmp =   OV7670_Buf[y-1][x-1].Y +
-        //                 OV7670_Buf[y-1][x  ].Y +
-        //                 OV7670_Buf[y-1][x+1].Y +
-        //                 OV7670_Buf[y  ][x  ].Y +
-        //                 OV7670_Buf[y  ][x  ].Y +
-        //                 OV7670_Buf[y  ][x  ].Y +
-        //                 OV7670_Buf[y+1][x-1].Y +
-        //                 OV7670_Buf[y+1][x  ].Y +
-        //                 OV7670_Buf[y+1][x+1].Y;
-        //         OV7670_Layer[y][x] = tmp / 16;
-        //     }
-        // }
+        for(int y = 1; y < OV7670_HEIGHT - 2; y++) {
+            for(int x = 1; x < OV7670_WIDTH - 2; x++) {
+                tmp =   OV7670_Buf[y-1][x-1].Y*1 +
+                        OV7670_Buf[y-1][x  ].Y*2 +
+                        OV7670_Buf[y-1][x+1].Y*1 +
+                        OV7670_Buf[y  ][x-1].Y*2 +
+                        OV7670_Buf[y  ][x  ].Y*4 +
+                        OV7670_Buf[y  ][x+1].Y*2 +
+                        OV7670_Buf[y+1][x-1].Y*1 +
+                        OV7670_Buf[y+1][x  ].Y*2 +
+                        OV7670_Buf[y+1][x+1].Y*1;
+                OV7670_Layer[y][x] = tmp / 16;
+            }
+        }
         for(int y = 1; y < GRAM_HEIGHT - 2; y++) {
             for(int x = 1; x < GRAM_WIDTH - 2; x++) {
-                tmp =   OV7670_Buf[y][x].Y*4 -
-                        OV7670_Buf[y-1][x].Y -
-                        OV7670_Buf[y][x-1].Y -
-                        OV7670_Buf[y][x+1].Y -
-                        OV7670_Buf[y+1][x].Y;
+                tmp =   OV7670_Layer[y][x]*4 -
+                        OV7670_Layer[y-1][x] -
+                        OV7670_Layer[y][x-1] -
+                        OV7670_Layer[y][x+1] -
+                        OV7670_Layer[y+1][x];
+                // tmp =   OV7670_Buf[y][x].Y*4 -
+                //         OV7670_Buf[y-1][x].Y -
+                //         OV7670_Buf[y][x-1].Y -
+                //         OV7670_Buf[y][x+1].Y -
+                //         OV7670_Buf[y+1][x].Y;
+                // tmp =   OV7670_Layer[y][x]*8 -
+                //         OV7670_Layer[y-1][x-1] -
+                //         OV7670_Layer[y-1][x  ] -
+                //         OV7670_Layer[y-1][x+1] -
+                //         OV7670_Layer[y  ][x-1] -
+                //         OV7670_Layer[y  ][x+1] -
+                //         OV7670_Layer[y+1][x-1] -
+                //         OV7670_Layer[y+1][x  ] -
+                //         OV7670_Layer[y+1][x+1];
                 // tmp =   OV7670_Buf[y][x].Y*8 -
                 //         OV7670_Buf[y-1][x-1].Y -
                 //         OV7670_Buf[y-1][x  ].Y -
