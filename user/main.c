@@ -30,6 +30,8 @@ int main(void) {
     delay_ms(1000);
     DCMI_CaptureCmd(ENABLE);
 
+    UART1_SendStr("> ");
+
     while(1) {
         // GPIO_SetBits(GPIOF, GPIO_Pin_9);
         // delay_ms(1000);

@@ -1,8 +1,10 @@
 #include <stm32f4xx_conf.h>
 #include <stm32f4xx.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "myDriver_uart.h"
+#include "myDriver_sccb.h"
 #include "myOV7670.h"
 
 void system_start(void) {
@@ -25,7 +27,7 @@ void system_start(void) {
 
 int get_token_size(char** str) {
     int size = 0;
-    while(*(*str) != ' ' && *(*str) != '\r') {
+    while(*(*str) != ' ' && *(*str) != '\0') {
         (*str)++;
         size++;
     }
@@ -47,25 +49,16 @@ int devmem(char* args) {
         UART1_SendStr("Usage: devmem reg_addr [w value]\r\n");
         return 1;
     }
-    tmp = (char*)malloc(arg_len + 1);
-    memset(tmp, 0, arg_len + 1);
-    strncpy(tmp, arg, arg_len);
-    addr = strtoul(tmp+2, NULL, 16);
-    free(tmp);
+    addr = strtoul(arg, NULL, 0);
 
     arg = args;
     arg_len = get_token_size(&args);
     if(arg_len == 0) {
-        tmp = (char*)malloc(64);
-        memset(tmp, 0, 64);
-        sprintf(tmp, "Value in 0x%08x is 0x%08x(%u)\r\n", addr, *addr, *addr);
-        UART1_SendStr(tmp);
-        free(tmp);
+        printf("Value in 0x%08x is 0x%08x(%u)\r\n", addr, *addr, *addr);
         return 0;
     }
     if(arg_len == 1 && arg[0] == 'w') {
         arg = args;
-        UART1_SendStr(arg);
         arg_len = get_token_size(&args);
         if(arg_len == 0) {
             UART1_SendStr("lack of params\r\n");
@@ -73,25 +66,50 @@ int devmem(char* args) {
             return -1;
         }
 
-        tmp = (char*)malloc(arg_len + 1);
-        memset(tmp, 0, arg_len + 1);
-        strncpy(tmp, arg, arg_len);
-        if(tmp[0] == '0' && tmp[1] == 'x') {
-            val = strtoul(tmp+2, NULL, 16);
-        } else {
-            val = strtoul(tmp, NULL, 10);
-        }
-        free(tmp);
-
-        tmp = (char*)malloc(64);
-        memset(tmp, 0, 64);
-        sprintf(tmp, "Wrote 0x%08x(%u) to 0x%08x\r\n", val, val, addr);
-        UART1_SendStr(tmp);
-        free(tmp);
+        val = strtoul(arg, NULL, 0);
         *addr = val;
+        printf("Wrote 0x%08x(%u) to 0x%08x\r\n", val, val, addr);
     } else {
         UART1_SendStr("params worng\r\n");
         UART1_SendStr("Usage: devmem reg_addr [w value]\r\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+int sccb(char* args) {
+    int arg_len;
+    char *arg = args;
+    uint8_t addr;
+    uint8_t value;
+
+    arg_len = get_token_size(&args);
+    if(arg_len == 0) {
+        UART1_SendStr("Usage: sccb addr [w value]\r\n");
+        return 1;
+    }
+
+    addr = strtoul(arg, NULL, 0);
+    arg = args;
+    arg_len = get_token_size(&args);
+    if(arg_len == 0) {
+        value = SCCB_ReadReg(OV7670_ADDR, addr);
+        printf("Value at 0x%02x is 0x%02x(%u)\r\n", addr, value, value);
+    } else if (arg_len == 1 && arg[0] == 'w') {
+        arg = args;
+        arg_len = get_token_size(&args);
+        if (arg_len != 0) {
+            value = strtoul(arg, NULL, 0);
+            SCCB_WriteReg(OV7670_ADDR, addr, value);
+            printf("Wrote 0x%02x(%u) to 0x%02x\r\n", value, value, addr);
+        } else {
+            UART1_SendStr("lack of params\r\n");
+            UART1_SendStr("Usage: sccb addr [w value]\r\n");
+        }
+    } else {
+        UART1_SendStr("params worng\r\n");
+        UART1_SendStr("Usage: sccb addr [w value]\r\n");
         return -1;
     }
 
@@ -123,9 +141,13 @@ int process_cmd(char* cmd, int cmd_len) {
         case 4:
             if(strncmp(token, "help", token_len) == 0) {
                 UART1_SendStr("mcu shell cmd:\r\n");
+                UART1_SendStr("sccb - read/write value of camera register\r\n");
                 UART1_SendStr("devmem - read/write value of register\r\n");
+                UART1_SendStr("getexp - get camera exposure time\r\n");
                 UART1_SendStr("threshold - set gray threshold value\r\n");
                 UART1_SendStr("help - show this info\r\n");
+            } else if (strncmp(token, "sccb", token_len) == 0) {
+                ret = sccb(cmd);
             } else {
                 goto wrong;
             }
@@ -133,6 +155,8 @@ int process_cmd(char* cmd, int cmd_len) {
         case 6:
             if(strncmp(token, "devmem", token_len) == 0) {
                 ret = devmem(cmd);
+            } else if(strncmp(token, "getexp", token_len) == 0) {
+                printf("AEC = %04x\r\n", OV7670_GetAEC());
             } else {
                 goto wrong;
             }
@@ -146,10 +170,12 @@ int process_cmd(char* cmd, int cmd_len) {
             break;
         default:
             wrong:
-            UART1_SendStr("Unknown cmd\r\n");
+            printf("Unknown cmd %s(%d)\r\n", token, token_len);
             UART1_SendStr("use \"help\" to show cmd info\r\n");
             break;
     }
+
+    UART1_SendStr("> ");
 
     return ret;
 }

@@ -137,28 +137,69 @@ int  UART1_SendnStr(char *str, uint32_t n) {
 
 void USART1_IRQHandler(void) {
     char tmp;
+    static uint8_t status = 0;
     if(USART_GetITStatus(USART1, USART_IT_RXNE)) {
-        tmp = USART_ReceiveData(USART1);
-        USART_SendData(USART1, tmp);
-        while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
-        if(tmp == '\b') {
-            USART_SendData(USART1, ' ');
-            while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
-            USART_SendData(USART1, '\b');
-            while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
-            uart1_dual_buf.index--;
-            uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = 0;
-        } else {
-            uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = tmp;
-            uart1_dual_buf.index++;
-        }
-        if(tmp == '\r') {
-            USART_SendData(USART1, '\n');
-            while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
-            uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = 0;
-            UART1_SwitchSlot();
-        }
         USART_ClearITPendingBit(USART1, USART_IT_RXNE);
+        tmp = USART_ReceiveData(USART1);
+        switch (status) {
+        case 0x00:
+            switch (tmp) {
+            case '\b':
+                UART1_SendStr("\b \b");
+                uart1_dual_buf.index--;
+                uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = 0;
+                break;
+            case '\r':
+                UART1_SendStr("\r\n");
+                uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = 0;
+                UART1_SwitchSlot();
+                break;
+            case 0x1b:
+                status |= 0x01;
+                break;
+            default:
+                USART_SendData(USART1, tmp);
+                uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = tmp;
+                uart1_dual_buf.index++;
+                break;
+            }
+            break;
+        case 0x01:
+            switch (tmp) {
+            case '[':
+                status |= 0x02;
+                break;
+            default:
+                status = 0;
+                USART_SendData(USART1, tmp);
+                uart1_dual_buf.buf[uart1_dual_buf.slot_num][uart1_dual_buf.index] = tmp;
+                uart1_dual_buf.index++;
+                break;
+            }
+            break;
+        case 0x03:
+            switch (tmp) {
+            case 'A':
+            case 'B':
+                UART1_SendStr("\r> ");
+                for (int i = uart1_dual_buf.index; i > 0; i--) {
+                    USART_SendData(USART1, ' ');
+                    while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
+                }
+                UART1_SendStr("\r\x1b[2C");
+                uart1_dual_buf.buf_len[uart1_dual_buf.slot_num] = uart1_dual_buf.index;
+                UART1_SetSlot(uart1_dual_buf.slot_num ^ 0x01);
+                uart1_dual_buf.index = uart1_dual_buf.buf_len[uart1_dual_buf.slot_num];
+                UART1_SendnStr(uart1_dual_buf.buf[uart1_dual_buf.slot_num], uart1_dual_buf.buf_len[uart1_dual_buf.slot_num]);
+                status = 0;
+                break;
+            default:
+                status = 0;
+                break;
+            }
+            break;
+        }
+        while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
     }
     return;
 }

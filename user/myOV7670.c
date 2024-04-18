@@ -8,19 +8,35 @@
 #define OV7670_ADDR         0x42
 #define OV7670_WIDTH        64
 #define OV7670_HEIGHT       48
+#define OV7670_RATE         2
 #define OV7670_BUF_SIZE     (OV7670_WIDTH * OV7670_HEIGHT)
-#define COM7    0x12
+
+#define VREF    0x03
+#define COM1    0x04
+#define AECHH   0x07
 #define PID     0x0A
 #define VER     0x0B
+#define COM3    0x0C
+#define AECH    0x10
+#define COM7    0x12
+#define COM9    0x14
+#define HSTART  0x17
+#define HSTOP   0x18
+#define VSTART  0x19
+#define VSTOP   0x1A
 #define MIDH    0x1C
 #define MIDL    0x1D
+#define HREF    0x32
+#define COM14   0x3E
+#define DCWCTR  0x72
+#define PCLKDIV 0x73
 
 struct s_YCbCr {
     uint8_t CbCr;
     uint8_t Y;
 } OV7670_Buf[OV7670_HEIGHT][OV7670_WIDTH] = {0};
 uint8_t OV7670_Layer[OV7670_HEIGHT][OV7670_WIDTH] = {0};
-uint8_t grayThreshold = 0x0a;
+uint8_t grayThreshold = 0x10;
 
 uint16_t OV7670_GetMID(void) {
     uint16_t MID = 0;
@@ -36,7 +52,15 @@ uint16_t OV7670_GetPID(void) {
     return ID;
 }
 
-OV7670_SetSize(uint16_t width, uint16_t height) {
+uint16_t OV7670_GetAEC(void) {
+    uint16_t AEC = 0;
+    AEC =   ((SCCB_ReadReg(OV7670_ADDR, AECHH) & 0x3F) << 10) |
+            (SCCB_ReadReg(OV7670_ADDR, AECH) << 1) |
+            (SCCB_ReadReg(OV7670_ADDR, COM1) & 0x03);
+    return AEC;
+}
+
+void OV7670_SetSize(uint16_t width, uint16_t height) {
     uint8_t Hstart;
     uint8_t Hstop;
     uint8_t Hlow;
@@ -51,12 +75,34 @@ OV7670_SetSize(uint16_t width, uint16_t height) {
     Vstop  = 0x3F + height / 8;
     Vlow   = (4 - ((height / 2) % 4)) & 0x3 | (((height / 2) % 4) & 0x3) << 2;
 
-    SCCB_WriteReg(OV7670_ADDR, 0x17, Hstart);
-    SCCB_WriteReg(OV7670_ADDR, 0x18, Hstop);
-    SCCB_WriteReg(OV7670_ADDR, 0x32, Hlow);
-    SCCB_WriteReg(OV7670_ADDR, 0x19, Vstart);
-    SCCB_WriteReg(OV7670_ADDR, 0x1A, Vstop);
-    SCCB_WriteReg(OV7670_ADDR, 0x03, Vlow);
+    SCCB_WriteReg(OV7670_ADDR, HSTART, Hstart);
+    SCCB_WriteReg(OV7670_ADDR, HSTOP, Hstop);
+    SCCB_WriteReg(OV7670_ADDR, HREF, Hlow);
+    SCCB_WriteReg(OV7670_ADDR, VSTART, Vstart);
+    SCCB_WriteReg(OV7670_ADDR, VSTOP, Vstop);
+    SCCB_WriteReg(OV7670_ADDR, VREF, Vlow);
+}
+
+void OV7670_SetDownSampling(uint8_t rate) {
+    switch (rate)
+    {
+    case 2:
+        rate = 0x1;
+        break;
+    case 4:
+        rate = 0x2;
+        break;
+    case 8:
+        rate = 0x3;
+        break;
+    default:
+        return;
+    }
+
+    SCCB_WriteReg(OV7670_ADDR, COM3, 0x04);             // Enable down sampling
+    SCCB_WriteReg(OV7670_ADDR, COM14, 0x10 | rate);      // Enable down sampling PCLK control, set PCLK divider /4
+    SCCB_WriteReg(OV7670_ADDR, DCWCTR, rate << 4 | rate); // down sample /4
+    SCCB_WriteReg(OV7670_ADDR, PCLKDIV, rate);             // clock divider /4 (= PCLK divider)
 }
 
 int OV7670_SoftReset(void) {
@@ -68,13 +114,10 @@ int OV7670_SoftReset(void) {
         return -1;
     }
 
-    OV7670_SetSize(OV7670_WIDTH * 4, OV7670_HEIGHT * 4);
-    SCCB_WriteReg(OV7670_ADDR, 0x0C, 0x04);     // Enable down sampling
-    SCCB_WriteReg(OV7670_ADDR, 0x12, 0x00);     // Output format YUV
-    SCCB_WriteReg(OV7670_ADDR, 0x3E, 0x12);     // Enable down sampling PCLK control, set PCLK divider /4
-    SCCB_WriteReg(OV7670_ADDR, 0x72, 0x22);     // down sample /4
-    SCCB_WriteReg(OV7670_ADDR, 0x73, 0xF2);     // clock divider /4 (= PCLK divider)
-
+    SCCB_WriteReg(OV7670_ADDR, COM7, 0x00);     // Output format YUV
+    SCCB_WriteReg(OV7670_ADDR, COM9, 0x3a);
+    OV7670_SetSize(OV7670_WIDTH * OV7670_RATE, OV7670_HEIGHT * OV7670_RATE);
+    OV7670_SetDownSampling(OV7670_RATE);
     return 0;
 }
 
@@ -208,7 +251,7 @@ void DCMI_IRQHandler(void) {
                 //         OV7670_Buf[y+1][x  ].Y -
                 //         OV7670_Buf[y+1][x+1].Y;
                 // tmp = OV7670_Buf[y][x].Y;
-                if(tmp >= grayThreshold) {
+                if(-tmp >= grayThreshold) {
                     OLED_Data.GRAM[y / 8][x] |= 1 << y % 8;
                 } else {
                     OLED_Data.GRAM[y / 8][x] &= ~(1 << y % 8);
