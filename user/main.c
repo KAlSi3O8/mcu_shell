@@ -8,10 +8,12 @@
 #include "myDriver_tim.h"
 #include "myDriver_iic.h"
 #include "myDriver_sccb.h"
+#include "myDriver_rng.h"
 #include "myDriver_system.h"
 #include "myApp.h"
 #include "myOV7670.h"
 #include "mySSD1306.h"
+#include "myRANSAC.h"
 
 int main(void) {
     int32_t ready_slot;
@@ -20,6 +22,7 @@ int main(void) {
 
     UART1_Init();
     TIM6_Init();
+    RNG_Init();
     MCO2_Init();
     SCCB_Init();
     OV7670_SoftReset();
@@ -30,13 +33,18 @@ int main(void) {
     delay_ms(1000);
     DCMI_CaptureCmd(ENABLE);
 
-    UART1_SendStr("> ");
+    UART1_SendStr("\r\n> ");
 
     while(1) {
         // GPIO_SetBits(GPIOF, GPIO_Pin_9);
         // delay_ms(1000);
         // GPIO_ResetBits(GPIOF, GPIO_Pin_9);
         // delay_ms(1000);
+        // if(OV7670_List.index != 0) {
+        //     RANSAC();
+        //     OLED_Flush();
+        //     OV7670_List.index = 0;
+        // }
         ready_slot = UART1_GetReadySlot();
         if(ready_slot != -1) {
             process_cmd(uart1_dual_buf.buf[ready_slot], uart1_dual_buf.buf_len[ready_slot]);

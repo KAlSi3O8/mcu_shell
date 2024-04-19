@@ -50,3 +50,17 @@ void OLED_Fill(uint8_t byte) {
 void OLED_Flush(void) {
     OLED_nData((uint8_t *)&OLED_Data, sizeof(OLED_Data));
 }
+
+void OLED_TargetX(uint8_t x, uint8_t y) {
+    if(x >= 2 && x < GRAM_WIDTH - 2 && y >= 2 && y < GRAM_HEIGHT - 2) {
+        OLED_Data.GRAM[y/8][x-2] |= 1 << y % 8;
+        OLED_Data.GRAM[y/8][x-1] |= 1 << y % 8;
+        OLED_Data.GRAM[(y-2)/8][x  ] |= 1 << (y-2) % 8;
+        OLED_Data.GRAM[(y-1)/8][x  ] |= 1 << (y-1) % 8;
+        OLED_Data.GRAM[y/8][x  ] |= 1 << y % 8;
+        OLED_Data.GRAM[(y+1)/8][x  ] |= 1 << (y+1) % 8;
+        OLED_Data.GRAM[(y+2)/8][x  ] |= 1 << (y+2) % 8;
+        OLED_Data.GRAM[y/8][x+1] |= 1 << y % 8;
+        OLED_Data.GRAM[y/8][x+2] |= 1 << y % 8;
+    }
+}

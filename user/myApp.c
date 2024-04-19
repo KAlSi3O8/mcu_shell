@@ -144,6 +144,7 @@ int process_cmd(char* cmd, int cmd_len) {
                 UART1_SendStr("sccb - read/write value of camera register\r\n");
                 UART1_SendStr("devmem - read/write value of register\r\n");
                 UART1_SendStr("getexp - get camera exposure time\r\n");
+                UART1_SendStr("capture - capture one frame from camera\r\n");
                 UART1_SendStr("threshold - set gray threshold value\r\n");
                 UART1_SendStr("help - show this info\r\n");
             } else if (strncmp(token, "sccb", token_len) == 0) {
@@ -157,6 +158,13 @@ int process_cmd(char* cmd, int cmd_len) {
                 ret = devmem(cmd);
             } else if(strncmp(token, "getexp", token_len) == 0) {
                 printf("AEC = %04x\r\n", OV7670_GetAEC());
+            } else {
+                goto wrong;
+            }
+            break;
+        case 7:
+            if(strncmp(token, "capture", token_len) == 0) {
+                DCMI_CaptureCmd(ENABLE);
             } else {
                 goto wrong;
             }

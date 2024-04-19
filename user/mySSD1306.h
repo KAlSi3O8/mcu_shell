@@ -16,5 +16,6 @@ void OLED_Init(void);
 void OLED_SetSize(uint8_t width, uint8_t height);
 void OLED_Fill(uint8_t byte);
 void OLED_Flush(void);
+void OLED_TargetX(uint8_t x, uint8_t y);
 
 #endif
