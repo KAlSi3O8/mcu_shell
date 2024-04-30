@@ -64,3 +64,16 @@ void OLED_TargetX(uint8_t x, uint8_t y) {
         OLED_Data.GRAM[y/8][x+2] |= 1 << y % 8;
     }
 }
+
+void OLED_Square(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
+    if(x0 >= 1 && x1 < GRAM_WIDTH - 1 && y0 >= 1 && y1 < GRAM_HEIGHT - 1) {
+        for(int x = x0; x < x1; x++) {
+            OLED_Data.GRAM[y0/8][x] |= 1 << y0 % 8;
+            OLED_Data.GRAM[y1/8][x] |= 1 << y1 % 8;
+        }
+        for(int y = y0; y < y1; y++) {
+            OLED_Data.GRAM[y/8][x0] |= 1 << y % 8;
+            OLED_Data.GRAM[y/8][x1] |= 1 << y % 8;
+        }
+    }
+}

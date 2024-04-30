@@ -19,7 +19,7 @@ void system_start(void) {
     GPIO_Init(GPIOF, &hGPIOF);
     GPIO_ResetBits(GPIOF, GPIO_Pin_9);
 
-    NVIC_SetPriorityGrouping(NVIC_PriorityGroup_0);
+    NVIC_SetPriorityGrouping(NVIC_PriorityGroup_1);
 
     return;
 }

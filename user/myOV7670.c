@@ -5,13 +5,8 @@
 #include "myDriver_sccb.h"
 #include "myDriver_tim.h"
 #include "mySSD1306.h"
+#include "myOV7670.h"
 #include "myRANSAC.h"
-
-#define OV7670_ADDR         0x42
-#define OV7670_WIDTH        64
-#define OV7670_HEIGHT       48
-#define OV7670_RATE         2
-#define OV7670_BUF_SIZE     (OV7670_WIDTH * OV7670_HEIGHT)
 
 #define VREF    0x03
 #define COM1    0x04
@@ -35,10 +30,7 @@
 #define DCWCTR  0x72
 #define PCLKDIV 0x73
 
-struct s_buf {
-    uint8_t Layer1;
-    uint8_t Layer0;
-} OV7670_Buf[OV7670_HEIGHT][OV7670_WIDTH] = {0};
+struct s_buf OV7670_Buf[OV7670_HEIGHT][OV7670_WIDTH] = {0};
 uint8_t grayThreshold = 0x10;
 
 uint16_t OV7670_GetMID(void) {
@@ -118,7 +110,7 @@ int OV7670_SoftReset(void) {
     }
 
     SCCB_WriteReg(OV7670_ADDR, COM7, 0x00);     // Output format YUV
-    // SCCB_WriteReg(OV7670_ADDR, COM9, 0x3a);
+    SCCB_WriteReg(OV7670_ADDR, COM9, 0x1a);
     SCCB_WriteReg(OV7670_ADDR, CLKRC, 0x81);    // pre-scale by 4
     SCCB_WriteReg(OV7670_ADDR, MVFC, 0x20);     // mirror horizen
     OV7670_SetSize(OV7670_WIDTH * OV7670_RATE, OV7670_HEIGHT * OV7670_RATE);
@@ -173,7 +165,7 @@ int OV7670_Init(void) {
     hDCMI.DCMI_PCKPolarity = DCMI_PCKPolarity_Rising;
     hDCMI.DCMI_VSPolarity  = DCMI_VSPolarity_High;
     hDCMI.DCMI_HSPolarity  = DCMI_HSPolarity_Low;
-    hDCMI.DCMI_CaptureRate = DCMI_CaptureRate_All_Frame;
+    hDCMI.DCMI_CaptureRate = DCMI_CaptureRate_1of2_Frame;
     hDCMI.DCMI_ExtendedDataMode = DCMI_ExtendedDataMode_8b;
     DCMI_Init(&hDCMI);
     DCMI_ITConfig(DCMI_IT_FRAME, ENABLE);
@@ -197,8 +189,8 @@ int OV7670_Init(void) {
     DMA_Cmd(DMA2_Stream1, ENABLE);
 
     hNVIC.NVIC_IRQChannel = DCMI_IRQn;
-    hNVIC.NVIC_IRQChannelPreemptionPriority = 0;
-    hNVIC.NVIC_IRQChannelSubPriority = 10;
+    hNVIC.NVIC_IRQChannelPreemptionPriority = 1;
+    hNVIC.NVIC_IRQChannelSubPriority = 7;
     hNVIC.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&hNVIC);
 
@@ -214,48 +206,50 @@ void DCMI_IRQHandler(void) {
         DMA_Cmd(DMA2_Stream1, ENABLE);
 
         // Gaussian filter
-        for(int y = 0; y < OV7670_HEIGHT; y++) {
-            for(int x = 0; x < OV7670_WIDTH; x++) {
-                if(x == 0 || x == OV7670_WIDTH - 1 || y == 0 || y == OV7670_HEIGHT - 1) {
-                    OV7670_Buf[y][x].Layer1 = 0;
-                } else {
-                    tmp =   OV7670_Buf[y-1][x-1].Layer0*1 +
-                            OV7670_Buf[y-1][x  ].Layer0*2 +
-                            OV7670_Buf[y-1][x+1].Layer0*1 +
-                            OV7670_Buf[y  ][x-1].Layer0*2 +
-                            OV7670_Buf[y  ][x  ].Layer0*4 +
-                            OV7670_Buf[y  ][x+1].Layer0*2 +
-                            OV7670_Buf[y+1][x-1].Layer0*1 +
-                            OV7670_Buf[y+1][x  ].Layer0*2 +
-                            OV7670_Buf[y+1][x+1].Layer0*1;
-                    OV7670_Buf[y][x].Layer1 = tmp / 16;
-                }
-            }
-        }
+        GaussianFilter();
+        // for(int y = 0; y < OV7670_HEIGHT; y++) {
+        //     for(int x = 0; x < OV7670_WIDTH; x++) {
+        //         if(x == 0 || x == OV7670_WIDTH - 1 || y == 0 || y == OV7670_HEIGHT - 1) {
+        //             OV7670_Buf[y][x].Layer1 = 0;
+        //         } else {
+        //             tmp =   OV7670_Buf[y-1][x-1].Layer0*1 +
+        //                     OV7670_Buf[y-1][x  ].Layer0*2 +
+        //                     OV7670_Buf[y-1][x+1].Layer0*1 +
+        //                     OV7670_Buf[y  ][x-1].Layer0*2 +
+        //                     OV7670_Buf[y  ][x  ].Layer0*4 +
+        //                     OV7670_Buf[y  ][x+1].Layer0*2 +
+        //                     OV7670_Buf[y+1][x-1].Layer0*1 +
+        //                     OV7670_Buf[y+1][x  ].Layer0*2 +
+        //                     OV7670_Buf[y+1][x+1].Layer0*1;
+        //             OV7670_Buf[y][x].Layer1 = tmp / 16;
+        //         }
+        //     }
+        // }
 
         // Edge detection and binarization
-        OV7670_List.index = 0;
-        for(int y = 0; y < OV7670_HEIGHT; y++) {
-            for(int x = 0; x < OV7670_WIDTH; x++) {
-                if(x == 0 || x == OV7670_WIDTH - 1 || y == 0 || y == OV7670_HEIGHT - 1) {
-                    OV7670_Buf[y][x].Layer0 = 0;
-                } else {
-                    tmp =   OV7670_Buf[y][x].Layer1*4 -
-                            OV7670_Buf[y-1][x].Layer1 -
-                            OV7670_Buf[y][x-1].Layer1 -
-                            OV7670_Buf[y][x+1].Layer1 -
-                            OV7670_Buf[y+1][x].Layer1;
-                    if(-tmp >= grayThreshold) {
-                        OLED_Data.GRAM[y / 8][x] |= 1 << y % 8;
-                        OV7670_List.pos[OV7670_List.index].x = x;
-                        OV7670_List.pos[OV7670_List.index].y = y;
-                        OV7670_List.index++;
-                    } else {
-                        OLED_Data.GRAM[y / 8][x] &= ~(1 << y % 8);
-                    }
-                }
-            }
-        }
+        EdgeDetection();
+        // OV7670_List.index = 0;
+        // for(int y = 0; y < OV7670_HEIGHT; y++) {
+        //     for(int x = 0; x < OV7670_WIDTH; x++) {
+        //         if(x == 0 || x == OV7670_WIDTH - 1 || y == 0 || y == OV7670_HEIGHT - 1) {
+        //             OV7670_Buf[y][x].Layer0 = 0;
+        //         } else {
+        //             tmp =   OV7670_Buf[y][x].Layer1*4 -
+        //                     OV7670_Buf[y-1][x].Layer1 -
+        //                     OV7670_Buf[y][x-1].Layer1 -
+        //                     OV7670_Buf[y][x+1].Layer1 -
+        //                     OV7670_Buf[y+1][x].Layer1;
+        //             if(-tmp >= grayThreshold) {
+        //                 OLED_Data.GRAM[y / 8][x] |= 1 << y % 8;
+        //                 OV7670_List.pos[OV7670_List.index].x = x;
+        //                 OV7670_List.pos[OV7670_List.index].y = y;
+        //                 OV7670_List.index++;
+        //             } else {
+        //                 OLED_Data.GRAM[y / 8][x] &= ~(1 << y % 8);
+        //             }
+        //         }
+        //     }
+        // }
 
         RANSAC();
         OLED_Flush();

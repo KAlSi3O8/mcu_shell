@@ -97,7 +97,7 @@ void UART1_Init(void) {
     hNVIC.NVIC_IRQChannel = USART1_IRQn;
     hNVIC.NVIC_IRQChannelCmd = ENABLE;
     hNVIC.NVIC_IRQChannelPreemptionPriority = 0;
-    hNVIC.NVIC_IRQChannelSubPriority = 10;
+    hNVIC.NVIC_IRQChannelSubPriority = 7;
     NVIC_Init(&hNVIC);
 
 // Initing RX buf

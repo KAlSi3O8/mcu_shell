@@ -51,7 +51,7 @@ void IIC_Init(void) {
     hNVIC.NVIC_IRQChannel = DMA1_Stream7_IRQn;
     hNVIC.NVIC_IRQChannelCmd = ENABLE;
     hNVIC.NVIC_IRQChannelPreemptionPriority = 0;
-    hNVIC.NVIC_IRQChannelSubPriority = 10;
+    hNVIC.NVIC_IRQChannelSubPriority = 7;
     NVIC_Init(&hNVIC);
 
     I2C_Cmd(I2C2, ENABLE);
@@ -97,9 +97,11 @@ void IIC_WriteBytes(uint8_t addr, uint8_t ctl, uint8_t *byte, uint32_t size) {
 }
 
 void DMA1_Stream7_IRQHandler(void) {
+    int timeout = 1000;
     if(DMA_GetITStatus(DMA1_Stream7, DMA_IT_TCIF7)) {
         DMA_ClearITPendingBit(DMA1_Stream7, DMA_IT_TCIF7);
-        while(0 == I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTED));
+        while(0 == I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTED) && timeout > 0)
+            timeout--;
         I2C_GenerateSTOP(I2C2, ENABLE);
         DMA_Cmd(DMA1_Stream7, DISABLE);
         I2C_DMACmd(I2C2, DISABLE);
