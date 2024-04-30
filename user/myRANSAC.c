@@ -97,14 +97,14 @@ void RANSAC(void) {
             arc_out.max.y = max.y;
             // printf("cnt=%d, y=%fx^2+%fx, (%d,%d), (%d,%d)\r\n", arc_out.cnt, a, b, arc_out.min.x, arc_out.min.y, arc_out.max.x, arc_out.max.y);
         }
-    } while(try++ < 300);
+    } while(try++ < 400);
 
-    if(cir_out.cnt >= 18) {
+    if(cir_out.cnt >= 20) {
         OLED_TargetX(cir_out.x, cir_out.y);
         // printf("(%d,%d)[%d], in:%d, try:%d\r\n", x0, y0, r0, in_cnt, try);
     }
     // printf("cnt=%d, (%d,%d), (%d,%d)\r\n", arc_out.cnt, arc_out.min.x, arc_out.min.y, arc_out.max.x, arc_out.max.y);
-    if(arc_out.cnt >= 60) {
+    if(arc_out.cnt >= 50) {
         OLED_Square(arc_out.min.x, arc_out.min.y, arc_out.max.x, arc_out.max.y);
     }
 }

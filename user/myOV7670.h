@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 #define OV7670_ADDR         0x42
-#define OV7670_WIDTH        64
-#define OV7670_HEIGHT       48
+#define OV7670_WIDTH        32
+#define OV7670_HEIGHT       24
 #define OV7670_RATE         8
 #define OV7670_BUF_SIZE     (OV7670_WIDTH * OV7670_HEIGHT)
 
