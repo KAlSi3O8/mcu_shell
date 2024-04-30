@@ -165,7 +165,7 @@ int OV7670_Init(void) {
     hDCMI.DCMI_PCKPolarity = DCMI_PCKPolarity_Rising;
     hDCMI.DCMI_VSPolarity  = DCMI_VSPolarity_High;
     hDCMI.DCMI_HSPolarity  = DCMI_HSPolarity_Low;
-    hDCMI.DCMI_CaptureRate = DCMI_CaptureRate_1of2_Frame;
+    hDCMI.DCMI_CaptureRate = DCMI_CaptureRate_1of4_Frame;
     hDCMI.DCMI_ExtendedDataMode = DCMI_ExtendedDataMode_8b;
     DCMI_Init(&hDCMI);
     DCMI_ITConfig(DCMI_IT_FRAME, ENABLE);
