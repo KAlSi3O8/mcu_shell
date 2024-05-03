@@ -17,6 +17,7 @@
 #define AECH    0x10
 #define CLKRC   0x11
 #define COM7    0x12
+#define COM8    0x13
 #define COM9    0x14
 #define HSTART  0x17
 #define HSTOP   0x18
@@ -50,9 +51,16 @@ uint16_t OV7670_GetPID(void) {
 uint16_t OV7670_GetAEC(void) {
     uint16_t AEC = 0;
     AEC =   ((SCCB_ReadReg(OV7670_ADDR, AECHH) & 0x3F) << 10) |
-            (SCCB_ReadReg(OV7670_ADDR, AECH) << 1) |
+            (SCCB_ReadReg(OV7670_ADDR, AECH) << 2) |
             (SCCB_ReadReg(OV7670_ADDR, COM1) & 0x03);
     return AEC;
+}
+
+void OV7670_SetAEC(uint16_t AEC) {
+    SCCB_WriteReg(OV7670_ADDR, AECHH, (AEC >> 10) & 0x3F);
+    SCCB_WriteReg(OV7670_ADDR, AECH , (AEC >>  2) & 0xFF);
+    SCCB_WriteReg(OV7670_ADDR, COM1 , (AEC >>  0) & 0x03);
+    printf("AEC is set to %04x\r\n", OV7670_GetAEC());
 }
 
 void OV7670_SetSize(uint16_t width, uint16_t height) {
@@ -109,10 +117,10 @@ int OV7670_SoftReset(void) {
         return -1;
     }
 
-    SCCB_WriteReg(OV7670_ADDR, COM7, 0x00);     // Output format YUV
-    SCCB_WriteReg(OV7670_ADDR, COM9, 0x1a);
+    SCCB_WriteReg(OV7670_ADDR, COM7,  0x00);     // Output format YUV
+    SCCB_WriteReg(OV7670_ADDR, COM9,  0x2a);     // maximum AGC 4x
     SCCB_WriteReg(OV7670_ADDR, CLKRC, 0x81);    // pre-scale by 4
-    SCCB_WriteReg(OV7670_ADDR, MVFC, 0x20);     // mirror horizen
+    SCCB_WriteReg(OV7670_ADDR, MVFC,  0x20);     // mirror horizen
     OV7670_SetSize(OV7670_WIDTH * OV7670_RATE, OV7670_HEIGHT * OV7670_RATE);
     OV7670_SetDownSampling(OV7670_RATE);
     return 0;
@@ -159,13 +167,13 @@ int OV7670_Init(void) {
     GPIO_PinAFConfig(GPIOE, GPIO_PinSource6, GPIO_AF_DCMI);     // D7
     GPIO_Init(GPIOE, &hGPIO);
 
-    hDCMI.DCMI_CaptureMode = DCMI_CaptureMode_Continuous;
-    // hDCMI.DCMI_CaptureMode = DCMI_CaptureMode_SnapShot;
+    // hDCMI.DCMI_CaptureMode = DCMI_CaptureMode_Continuous;
+    hDCMI.DCMI_CaptureMode = DCMI_CaptureMode_SnapShot;
     hDCMI.DCMI_SynchroMode = DCMI_SynchroMode_Hardware;
     hDCMI.DCMI_PCKPolarity = DCMI_PCKPolarity_Rising;
     hDCMI.DCMI_VSPolarity  = DCMI_VSPolarity_High;
     hDCMI.DCMI_HSPolarity  = DCMI_HSPolarity_Low;
-    hDCMI.DCMI_CaptureRate = DCMI_CaptureRate_1of2_Frame;
+    hDCMI.DCMI_CaptureRate = DCMI_CaptureRate_1of4_Frame;
     hDCMI.DCMI_ExtendedDataMode = DCMI_ExtendedDataMode_8b;
     DCMI_Init(&hDCMI);
     DCMI_ITConfig(DCMI_IT_FRAME, ENABLE);
@@ -207,49 +215,9 @@ void DCMI_IRQHandler(void) {
 
         // Gaussian filter
         GaussianFilter();
-        // for(int y = 0; y < OV7670_HEIGHT; y++) {
-        //     for(int x = 0; x < OV7670_WIDTH; x++) {
-        //         if(x == 0 || x == OV7670_WIDTH - 1 || y == 0 || y == OV7670_HEIGHT - 1) {
-        //             OV7670_Buf[y][x].Layer1 = 0;
-        //         } else {
-        //             tmp =   OV7670_Buf[y-1][x-1].Layer0*1 +
-        //                     OV7670_Buf[y-1][x  ].Layer0*2 +
-        //                     OV7670_Buf[y-1][x+1].Layer0*1 +
-        //                     OV7670_Buf[y  ][x-1].Layer0*2 +
-        //                     OV7670_Buf[y  ][x  ].Layer0*4 +
-        //                     OV7670_Buf[y  ][x+1].Layer0*2 +
-        //                     OV7670_Buf[y+1][x-1].Layer0*1 +
-        //                     OV7670_Buf[y+1][x  ].Layer0*2 +
-        //                     OV7670_Buf[y+1][x+1].Layer0*1;
-        //             OV7670_Buf[y][x].Layer1 = tmp / 16;
-        //         }
-        //     }
-        // }
 
         // Edge detection and binarization
         EdgeDetection();
-        // OV7670_List.index = 0;
-        // for(int y = 0; y < OV7670_HEIGHT; y++) {
-        //     for(int x = 0; x < OV7670_WIDTH; x++) {
-        //         if(x == 0 || x == OV7670_WIDTH - 1 || y == 0 || y == OV7670_HEIGHT - 1) {
-        //             OV7670_Buf[y][x].Layer0 = 0;
-        //         } else {
-        //             tmp =   OV7670_Buf[y][x].Layer1*4 -
-        //                     OV7670_Buf[y-1][x].Layer1 -
-        //                     OV7670_Buf[y][x-1].Layer1 -
-        //                     OV7670_Buf[y][x+1].Layer1 -
-        //                     OV7670_Buf[y+1][x].Layer1;
-        //             if(-tmp >= grayThreshold) {
-        //                 OLED_Data.GRAM[y / 8][x] |= 1 << y % 8;
-        //                 OV7670_List.pos[OV7670_List.index].x = x;
-        //                 OV7670_List.pos[OV7670_List.index].y = y;
-        //                 OV7670_List.index++;
-        //             } else {
-        //                 OLED_Data.GRAM[y / 8][x] &= ~(1 << y % 8);
-        //             }
-        //         }
-        //     }
-        // }
 
         RANSAC();
         OLED_Flush();

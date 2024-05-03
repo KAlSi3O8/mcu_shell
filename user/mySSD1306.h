@@ -14,7 +14,7 @@ extern struct s_GRAM OLED_Data;
 
 void OLED_Init(void);
 void OLED_SetSize(uint8_t width, uint8_t height);
-void OLED_Fill(uint8_t byte);
+void OLED_Fill(uint8_t byte, uint32_t size);
 void OLED_Flush(void);
 void OLED_TargetX(uint8_t x, uint8_t y);
 void OLED_Square(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1);

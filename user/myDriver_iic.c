@@ -65,18 +65,8 @@ void IIC_DMAWriteBytes(uint8_t addr, uint8_t *byte, uint32_t size) {
 
     I2C_GenerateSTART(I2C2, ENABLE);
     while(0 == I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT));
-    // delay_ms(1);
-    // while(0 == I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT)) {
-    //     delay_ms(10);
-    //     printf("SR=%04x%04x\r\n", I2C2->SR2, I2C2->SR1);
-    // }
     I2C_Send7bitAddress(I2C2, addr, I2C_Direction_Transmitter);
     while(0 == I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
-    // delay_ms(1);
-    // while(0 == I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED)) {
-    //     delay_ms(10);
-    //     printf("SR=%04x%04x\r\n", I2C2->SR2, I2C2->SR1);
-    // }
 }
 
 void IIC_WriteBytes(uint8_t addr, uint8_t ctl, uint8_t *byte, uint32_t size) {
@@ -90,6 +80,22 @@ void IIC_WriteBytes(uint8_t addr, uint8_t ctl, uint8_t *byte, uint32_t size) {
         I2C_SendData(I2C2, *byte);
         while(0 == I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTING));
         byte++;
+        size--;
+    }
+    while(0 == I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTED));
+    I2C_GenerateSTOP(I2C2, ENABLE);
+}
+
+void IIC_FillBytes(uint8_t addr, uint8_t ctl, uint8_t byte, uint32_t size) {
+    I2C_GenerateSTART(I2C2, ENABLE);
+    while(0 == I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT));
+    I2C_Send7bitAddress(I2C2, addr, I2C_Direction_Transmitter);
+    while(0 == I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
+    I2C_SendData(I2C2, ctl);
+    while(0 == I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTING));
+    while(size > 0) {
+        I2C_SendData(I2C2, byte);
+        while(0 == I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTING));
         size--;
     }
     while(0 == I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTED));

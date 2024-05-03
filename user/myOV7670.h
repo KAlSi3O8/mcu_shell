@@ -20,6 +20,7 @@ extern struct s_buf OV7670_Buf[OV7670_HEIGHT][OV7670_WIDTH];
 uint16_t OV7670_GetMID(void);
 uint16_t OV7670_GetPID(void);
 uint16_t OV7670_GetAEC(void);
+void OV7670_SetAEC(uint16_t AEC);
 int OV7670_SoftReset(void);
 int OV7670_Init(void);
 

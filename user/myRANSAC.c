@@ -19,7 +19,7 @@ void RANSAC(void) {
     struct s_cir_out cir_out = {0, 0, 0};
     struct s_arc_out arc_out = {0, {0, 0}, {0, 0}};
 
-    if(OV7670_List.index < 40 || OV7670_List.index > 300) {
+    if(OV7670_List.index < 30 || OV7670_List.index > 300) {
         return;
     }
 
@@ -95,15 +95,12 @@ void RANSAC(void) {
             arc_out.min.y = min.y;
             arc_out.max.x = max.x;
             arc_out.max.y = max.y;
-            // printf("cnt=%d, y=%fx^2+%fx, (%d,%d), (%d,%d)\r\n", arc_out.cnt, a, b, arc_out.min.x, arc_out.min.y, arc_out.max.x, arc_out.max.y);
         }
     } while(try++ < 400);
 
     if(cir_out.cnt >= 20) {
         OLED_TargetX(cir_out.x, cir_out.y);
-        // printf("(%d,%d)[%d], in:%d, try:%d\r\n", x0, y0, r0, in_cnt, try);
     }
-    // printf("cnt=%d, (%d,%d), (%d,%d)\r\n", arc_out.cnt, arc_out.min.x, arc_out.min.y, arc_out.max.x, arc_out.max.y);
     if(arc_out.cnt >= 50) {
         OLED_Square(arc_out.min.x, arc_out.min.y, arc_out.max.x, arc_out.max.y);
     }
@@ -114,7 +111,7 @@ void GaussianFilter(void) {
     for(int y = 0; y < OV7670_HEIGHT; y++) {
         for(int x = 0; x < OV7670_WIDTH; x++) {
             if(x == 0 || x == OV7670_WIDTH - 1 || y == 0 || y == OV7670_HEIGHT - 1) {
-                OV7670_Buf[y][x].Layer1 = 0;
+                OV7670_Buf[y][x].Layer1 = OV7670_Buf[y][x].Layer0;
             } else {
                 tmp =   OV7670_Buf[y-1][x-1].Layer0*1 +
                         OV7670_Buf[y-1][x  ].Layer0*2 +

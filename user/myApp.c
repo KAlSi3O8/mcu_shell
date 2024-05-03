@@ -158,6 +158,8 @@ int process_cmd(char* cmd, int cmd_len) {
                 ret = devmem(cmd);
             } else if(strncmp(token, "getexp", token_len) == 0) {
                 printf("AEC = %04x\r\n", OV7670_GetAEC());
+            } else if(strncmp(token, "setexp", token_len) == 0) {
+                OV7670_SetAEC(strtoul(cmd, NULL, 0));
             } else {
                 goto wrong;
             }
