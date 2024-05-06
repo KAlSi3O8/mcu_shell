@@ -167,13 +167,13 @@ int OV7670_Init(void) {
     GPIO_PinAFConfig(GPIOE, GPIO_PinSource6, GPIO_AF_DCMI);     // D7
     GPIO_Init(GPIOE, &hGPIO);
 
-    // hDCMI.DCMI_CaptureMode = DCMI_CaptureMode_Continuous;
-    hDCMI.DCMI_CaptureMode = DCMI_CaptureMode_SnapShot;
+    hDCMI.DCMI_CaptureMode = DCMI_CaptureMode_Continuous;
+    // hDCMI.DCMI_CaptureMode = DCMI_CaptureMode_SnapShot;
     hDCMI.DCMI_SynchroMode = DCMI_SynchroMode_Hardware;
     hDCMI.DCMI_PCKPolarity = DCMI_PCKPolarity_Rising;
     hDCMI.DCMI_VSPolarity  = DCMI_VSPolarity_High;
     hDCMI.DCMI_HSPolarity  = DCMI_HSPolarity_Low;
-    hDCMI.DCMI_CaptureRate = DCMI_CaptureRate_1of4_Frame;
+    hDCMI.DCMI_CaptureRate = DCMI_CaptureRate_1of2_Frame;
     hDCMI.DCMI_ExtendedDataMode = DCMI_ExtendedDataMode_8b;
     DCMI_Init(&hDCMI);
     DCMI_ITConfig(DCMI_IT_FRAME, ENABLE);

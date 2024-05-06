@@ -30,21 +30,11 @@ int main(void) {
     IIC_Init();
     OLED_Init();
 
-    delay_ms(1000);
+    delay_ms(500);
+    UART1_SendStr("\r\n> ");
     DCMI_CaptureCmd(ENABLE);
 
-    UART1_SendStr("\r\n> ");
-
     while(1) {
-        // GPIO_SetBits(GPIOF, GPIO_Pin_9);
-        // delay_ms(1000);
-        // GPIO_ResetBits(GPIOF, GPIO_Pin_9);
-        // delay_ms(1000);
-        // if(OV7670_List.index != 0) {
-        //     RANSAC();
-        //     OLED_Flush();
-        //     OV7670_List.index = 0;
-        // }
         ready_slot = UART1_GetReadySlot();
         if(ready_slot != -1) {
             process_cmd(uart1_dual_buf.buf[ready_slot], uart1_dual_buf.buf_len[ready_slot]);

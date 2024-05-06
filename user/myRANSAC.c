@@ -19,7 +19,7 @@ void RANSAC(void) {
     struct s_cir_out cir_out = {0, 0, 0};
     struct s_arc_out arc_out = {0, {0, 0}, {0, 0}};
 
-    if(OV7670_List.index < 30 || OV7670_List.index > 300) {
+    if(OV7670_List.index < 30 || OV7670_List.index > 200) {
         return;
     }
 
@@ -104,6 +104,7 @@ void RANSAC(void) {
     if(arc_out.cnt >= 50) {
         OLED_Square(arc_out.min.x, arc_out.min.y, arc_out.max.x, arc_out.max.y);
     }
+    // printf("%d,%d,%d,%d,%d,%d\r\n",cir_out.x, cir_out.y, arc_out.min.x, arc_out.min.y, arc_out.max.x, arc_out.max.y);
 }
 
 void GaussianFilter(void) {
