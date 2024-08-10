@@ -42,6 +42,7 @@
 // #include "stm32f4xx_tim.h"
 #include "stm32f4xx_usart.h"
 // #include "stm32f4xx_wwdg.h"
+#include "stm32f4x7_eth.h"
 #include "misc.h" /* High level functions for NVIC and SysTick (add-on to CMSIS functions) */
 
 #if defined (STM32F429_439xx)

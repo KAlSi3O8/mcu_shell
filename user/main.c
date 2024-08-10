@@ -175,8 +175,60 @@ void MCU_Shell_task(void *arg) {
     }
 }
 
+/*
+ * TXD0 --> PB12
+ * TXD1 --> PB13
+ * TXEN --> PB11
+ * RXD0 --> PC4
+ * RXD1 --> PC5
+ * MDC  --> PC1
+ * MDIO --> PA2
+ * REFC --> PA1
+ * CRSD --> PA7
+ */
+void MAC_Init(void) {
+    GPIO_InitTypeDef hETH_GPIO;
+    ETH_InitTypeDef hETH;
+    RCC_AHB1PeriphClockCmd(LED_CLK, ENABLE);
+    RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_ETHMACEN, ENABLE);
+    RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_ETHMACTXEN, ENABLE);
+    RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_ETHMACRXEN, ENABLE);
+
+    hETH_GPIO.GPIO_Mode = GPIO_Mode_AF;
+    hETH_GPIO.GPIO_OType = GPIO_OType_PP;
+    hETH_GPIO.GPIO_PuPd = GPIO_PuPd_NOPULL;
+    hETH_GPIO.GPIO_Speed = GPIO_High_Speed;
+
+    hETH_GPIO.GPIO_Pin = GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_7;
+    GPIO_Init(GPIOA, &hETH_GPIO);
+    GPIO_PinAFConfig(GPIOA, GPIO_PinSource1, GPIO_AF_ETH);
+    GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_ETH);
+    GPIO_PinAFConfig(GPIOA, GPIO_PinSource7, GPIO_AF_ETH);
+
+    hETH_GPIO.GPIO_Pin = GPIO_Pin_11 | GPIO_Pin_12 | GPIO_Pin_13;
+    GPIO_Init(GPIOB, &hETH_GPIO);
+    GPIO_PinAFConfig(GPIOB, GPIO_PinSource11, GPIO_AF_ETH);
+    GPIO_PinAFConfig(GPIOB, GPIO_PinSource12, GPIO_AF_ETH);
+    GPIO_PinAFConfig(GPIOB, GPIO_PinSource13, GPIO_AF_ETH);
+
+    hETH_GPIO.GPIO_Pin = GPIO_Pin_1 | GPIO_Pin_4 | GPIO_Pin_5;
+    GPIO_Init(GPIOC, &hETH_GPIO);
+    GPIO_PinAFConfig(GPIOC, GPIO_PinSource1, GPIO_AF_ETH);
+    GPIO_PinAFConfig(GPIOC, GPIO_PinSource4, GPIO_AF_ETH);
+    GPIO_PinAFConfig(GPIOC, GPIO_PinSource5, GPIO_AF_ETH);
+
+    ETH_StructInit(&hETH);
+    ETH_Init(&hETH, 0);
+    ETH_Start();
+
+    myos_log(ETH_ReadPHYRegister(0x0, 2));
+    
+}
+
 int main(void) {
     system_start();
+
+    
 
     myos_Init();
     myos_TaskCreate(&LED1_task, (void *)0, &LED1_Stk[MYOS_TASK_STK_START]);
