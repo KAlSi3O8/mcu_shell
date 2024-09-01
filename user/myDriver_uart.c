@@ -4,6 +4,13 @@
 
 struct _uart_dual_buf uart1_dual_buf;
 
+/*
+ * @brief   re-define _write for printf()
+ */
+int _write(int fd, char *ptr, int len) {
+    return usart1_sendnstr(ptr, len);
+}
+
 /**
  * @brief   set current usart1 buf slot
  * @param   slot: slot num(SLOT_A， SLOT_B)
@@ -104,27 +111,27 @@ void usart1_init(void) {
  * @param   str: message to be sent
  * @retval  None
  */
-void usart1_sendstr(char *str) {
+int usart1_sendstr(char *str) {
     int len = strlen(str);
     for(int i = 0; i < len; i++) {
         USART_SendData(USART1, str[i]);
         while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
     }
-    return;
+    return len;
 }
 
 /**
  * @brief   send n bytes of str to usart1
  * @param   str: message to be sent
  * @param   n: number of bytes to send
- * @retval  None
+ * @retval  number of bytes have sent
  */
-void usart1_sendnstr(char *str, uint32_t n) {
+int usart1_sendnstr(char *str, int n) {
     for(int i = 0; i < n; i++) {
         USART_SendData(USART1, str[i]);
         while(RESET == USART_GetFlagStatus(USART1, USART_FLAG_TXE));
     }
-    return;
+    return n;
 }
 
 void USART1_IRQHandler(void) {

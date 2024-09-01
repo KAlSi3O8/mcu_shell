@@ -19,8 +19,8 @@ struct _uart_dual_buf {
 extern struct _uart_dual_buf uart1_dual_buf;
 
 void usart1_init(void);
-void usart1_sendstr(char *str);
-void usart1_sendnstr(char *str, uint32_t n);
+int usart1_sendstr(char *str);
+int usart1_sendnstr(char *str, int n);
 int32_t usart1_get_ready_slot(void);
 int32_t usart1_set_slot(uint8_t slot);
 

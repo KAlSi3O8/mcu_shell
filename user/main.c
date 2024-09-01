@@ -105,6 +105,10 @@ int devmem(char* args) {
     return 0;
 }
 
+int mdio(char *args) {
+    return 0;
+}
+
 int process_cmd(char* cmd, int cmd_len) {
     int ret = 0;
     int token_len;
@@ -117,6 +121,8 @@ int process_cmd(char* cmd, int cmd_len) {
                 usart1_sendstr("mcu shell cmd:\r\n");
                 usart1_sendstr("devmem - show value of register\r\n");
                 usart1_sendstr("help - show this info\r\n");
+            } else if(strncmp(token, "mdio", token_len) == 0) {
+                ret = mdio(cmd);
             } else {
                 usart1_sendstr("Unknown cmd\r\n");
                 usart1_sendstr("use \"help\" to show cmd info\r\n");
@@ -189,10 +195,12 @@ void MCU_Shell_task(void *arg) {
 void MAC_Init(void) {
     GPIO_InitTypeDef hETH_GPIO;
     ETH_InitTypeDef hETH;
-    RCC_AHB1PeriphClockCmd(LED_CLK, ENABLE);
     RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_ETHMACEN, ENABLE);
     RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_ETHMACTXEN, ENABLE);
     RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_ETHMACRXEN, ENABLE);
+    RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_GPIOAEN, ENABLE);
+    RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_GPIOBEN, ENABLE);
+    RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_GPIOCEN, ENABLE);
 
     hETH_GPIO.GPIO_Mode = GPIO_Mode_AF;
     hETH_GPIO.GPIO_OType = GPIO_OType_PP;
@@ -217,19 +225,33 @@ void MAC_Init(void) {
     GPIO_PinAFConfig(GPIOC, GPIO_PinSource4, GPIO_AF_ETH);
     GPIO_PinAFConfig(GPIOC, GPIO_PinSource5, GPIO_AF_ETH);
 
+    RCC_APB2PeriphClockCmd(RCC_APB2ENR_SYSCFGEN, ENABLE);
+    SYSCFG_ETH_MediaInterfaceConfig(SYSCFG_ETH_MediaInterface_RMII);
+
     ETH_StructInit(&hETH);
-    ETH_Init(&hETH, 0);
+    
+    if(0 == ETH_Init(&hETH, 1)) {
+        printf("ETH_Init Error\r\n");
+    }
     ETH_Start();
 
-    myos_log(ETH_ReadPHYRegister(0x0, 2));
-    
+    printf("ID1:%04x\r\n", ETH_ReadPHYRegister(0x1, 2));
+    printf("ID2:%04x\r\n", ETH_ReadPHYRegister(0x1, 3));
 }
 
 int main(void) {
     system_start();
 
-    
+    printf("my MAC init Start -->\r\n");
+    MAC_Init();
+    printf("my MAC init End <--\r\n");
 
+    // MCU_Shell_task((void *)0);
+
+    // while(1) {
+    //     printf("ID1:%04x\r\n", ETH_ReadPHYRegister(0x1, 2));
+    // }
+// Enter OS
     myos_Init();
     myos_TaskCreate(&LED1_task, (void *)0, &LED1_Stk[MYOS_TASK_STK_START]);
     myos_TaskCreate(&LED2_task, (void *)0, &LED2_Stk[MYOS_TASK_STK_START]);
