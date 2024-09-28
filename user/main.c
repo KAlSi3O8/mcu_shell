@@ -11,6 +11,11 @@
 #define LED_PIN  GPIO_Pin_9 | GPIO_Pin_10
 #define LED_CLK  RCC_AHB1ENR_GPIOFEN
 
+#define DMA_DESC_AMOUNT 128
+ETH_DMADESCTypeDef DMA_TX_DESC[DMA_DESC_AMOUNT];
+ETH_DMADESCTypeDef DMA_RX_DESC[DMA_DESC_AMOUNT];
+size_t DMA_DESC_SIZE = sizeof(ETH_DMADESCTypeDef * DMA_DESC_AMOUNT);
+
 void system_start(void) {
     GPIO_InitTypeDef hLED;
     RCC_AHB1PeriphClockCmd(LED_CLK, ENABLE);
@@ -30,6 +35,11 @@ void system_start(void) {
     return;
 }
 
+/*
+ * get the len of current token
+ * the pointer will move to the beginning of next token
+ * please save current token to a net pointer
+ */
 int get_token_size(char** str) {
     int size = 0;
     while(*(*str) != ' ' && *(*str) != '\r') {
@@ -106,6 +116,37 @@ int devmem(char* args) {
 }
 
 int mdio(char *args) {
+    int ret = 0;
+    int arg_len;
+    char *arg = args;
+    uint16_t reg;
+    uint16_t value;
+
+    arg_len = get_token_size(&args);
+    if(arg_len == 0) {
+        printf("Usage: mdio reg [w value]\r\n");
+        return 0;
+    }
+    reg = (uint16_t)strtoul(arg, NULL, 0);
+    value = ETH_ReadPHYRegister(0x1, reg);
+
+    arg = args;
+    arg_len = get_token_size(&args);
+    if(arg_len != 0) {
+        if(0 == strncmp(arg, "w", arg_len)) {
+            arg = args;
+            arg_len = get_token_size(&args);
+            value = (uint16_t)strtoul(arg, NULL, 0);
+            ret = ETH_WritePHYRegister(0x1, reg, value);
+            printf("Write %04x to %04x\r\n", value, reg);
+        } else {
+            printf("wrong argument!\r\n Usage: mdio reg [w value]\r\n");
+            return -1;
+        }
+    } else {
+        printf("The value of %04x is %04x(%d)\r\n", reg, value, value);
+    }
+
     return 0;
 }
 
@@ -229,10 +270,21 @@ void MAC_Init(void) {
     SYSCFG_ETH_MediaInterfaceConfig(SYSCFG_ETH_MediaInterface_RMII);
 
     ETH_StructInit(&hETH);
-    
+    // Disable Auto Negotiation
+    hETH.ETH_AutoNegotiation = ETH_AutoNegotiation_Disable;
+    hETH.ETH_Speed = ETH_Speed_100M;
+    hETH.ETH_Mode = ETH_Mode_FullDuplex;
+
     if(0 == ETH_Init(&hETH, 1)) {
         printf("ETH_Init Error\r\n");
     }
+
+    // MAC descriptor init
+    memset(DMA_TX_DESC, 0, DMA_DESC_SIZE);
+    memset(DMA_RX_DESC, 0, DMA_DESC_SIZE);
+    
+    ETH_MACAddressConfig(ETH_MAC_Address0, "\xaa\xbb\xcc\xdd\xaa\x11");
+    ETH_DMAITConfig(ETH_DMA_IT_NIS | ETH_DMA_IT_R, ENABLE);
     ETH_Start();
 
     printf("ID1:%04x\r\n", ETH_ReadPHYRegister(0x1, 2));
@@ -246,7 +298,7 @@ int main(void) {
     MAC_Init();
     printf("my MAC init End <--\r\n");
 
-    // MCU_Shell_task((void *)0);
+    MCU_Shell_task((void *)0);
 
     // while(1) {
     //     printf("ID1:%04x\r\n", ETH_ReadPHYRegister(0x1, 2));

@@ -366,16 +366,19 @@ uint32_t ETH_Init(ETH_InitTypeDef* ETH_InitStruct, uint16_t PHYAddress)
   ETH->MACMIIAR = (uint32_t)tmpreg;  
   /*-------------------- PHY initialization and configuration ----------------*/
   /* Put the PHY in reset mode */
+  printf("PHY Reset -->\r\n");
   if(!(ETH_WritePHYRegister(PHYAddress, PHY_BCR, PHY_Reset)))
   {
     /* Return ERROR in case of write timeout */
     err = ETH_ERROR;
     goto error;
   }
+  printf("PHY Reset Done <--\r\n");
   
   /* Delay to assure PHY reset */
   _eth_delay_(PHY_RESET_DELAY);
   
+  printf("PHY Config Auto-neg -->\r\n");
   if(ETH_InitStruct->ETH_AutoNegotiation != ETH_AutoNegotiation_Disable)
   {
     /* We wait for linked status...*/
@@ -442,8 +445,19 @@ uint32_t ETH_Init(ETH_InitTypeDef* ETH_InitStruct, uint16_t PHYAddress)
   }
   else
   {
-    if(!ETH_WritePHYRegister(PHYAddress, PHY_BCR, ((uint16_t)(ETH_InitStruct->ETH_Mode >> 3) |
-                                                   (uint16_t)(ETH_InitStruct->ETH_Speed >> 1))))
+    RegValue = 0x1;
+    if(ETH_InitStruct->ETH_Mode == ETH_Speed_100M && ETH_InitStruct->ETH_Speed == ETH_Mode_FullDuplex) {
+      RegValue |= 1 << 8;
+    } else if(ETH_InitStruct->ETH_Mode == ETH_Speed_100M && ETH_InitStruct->ETH_Speed == ETH_Mode_HalfDuplex) {
+      RegValue |= 1 << 7;
+    } else if(ETH_InitStruct->ETH_Mode == ETH_Speed_10M && ETH_InitStruct->ETH_Speed == ETH_Mode_FullDuplex) {
+      RegValue |= 1 << 6;
+    } else if(ETH_InitStruct->ETH_Mode == ETH_Speed_10M && ETH_InitStruct->ETH_Speed == ETH_Mode_HalfDuplex) {
+      RegValue |= 1 << 5;
+    } else {
+      RegValue = 0x1E1;
+    }
+    if(!ETH_WritePHYRegister(PHYAddress, PHY_BCR, 0x1000) || !ETH_WritePHYRegister(PHYAddress, 0x4, RegValue))
     {
       /* Return ERROR in case of write timeout */
       err = ETH_ERROR;
@@ -460,6 +474,7 @@ error:
     /* Set Ethernet speed to 100M */
     ETH_InitStruct->ETH_Speed = ETH_Speed_100M;
   }
+  printf("PHY Config Auto-neg Done <--\r\n");
 
   /*------------------------ ETHERNET MACCR Configuration --------------------*/
     /* Get the ETHERNET MACCR value */
@@ -1913,7 +1928,7 @@ FlagStatus ETH_GetDMAFlagStatus(uint32_t ETH_DMA_FLAG)
 }
 
 /**
-  * @brief  Clears the ETHERNET’s DMA pending flag.
+  * @brief  Clears the ETHERNETï¿½s DMA pending flag.
   * @param  ETH_DMA_FLAG: specifies the flag to clear.
   *   This parameter can be any combination of the following values:
   *     @arg ETH_DMA_FLAG_NIS : Normal interrupt summary flag
@@ -2025,7 +2040,7 @@ ITStatus ETH_GetDMAITStatus(uint32_t ETH_DMA_IT)
 }
 
 /**
-  * @brief  Clears the ETHERNET’s DMA IT pending bit.
+  * @brief  Clears the ETHERNETï¿½s DMA IT pending bit.
   * @param  ETH_DMA_IT: specifies the interrupt pending bit to clear.
   *   This parameter can be any combination of the following values:
   *     @arg ETH_DMA_IT_NIS : Normal interrupt summary 
